@@ -1,3 +1,6 @@
+@import "tailwindcss";
+@plugin "daisyui";
+
 /* minimal styles so Vite is happy */
 html, body, #root { height: 100%; }
 body { margin: 0; font-family: system-ui, Segoe UI, Roboto, sans-serif; }
