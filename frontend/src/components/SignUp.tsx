@@ -1,39 +1,6 @@
-import React, { useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { createNewAccount, isLocalNet } from '../chain/account-manager'
 import { NavLink } from 'react-router-dom'
-
-const cardStyle: React.CSSProperties = {
-  border: '1px solid #e5e7eb',
-  borderRadius: 12,
-  padding: '1.5rem',
-  background: '#ffffff',
-  boxShadow: '0 12px 30px rgba(15, 23, 42, 0.08)',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '0.75rem',
-}
-
-const primaryActionStyle: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0.6rem 1rem',
-  border: '1px solid #111827',
-  borderRadius: 8,
-  background: '#111827',
-  color: '#ffffff',
-  fontWeight: 600,
-  textDecoration: 'none',
-  cursor: 'pointer',
-}
-
-const successBoxStyle: React.CSSProperties = {
-  padding: '1rem',
-  borderRadius: 8,
-  background: '#ecfdf5',
-  border: '1px solid #10b981',
-  marginTop: '0.5rem',
-}
 
 function shortAddress(address: string): string {
   if (address.length <= 10) return address
@@ -68,103 +35,105 @@ export default function SignUp(): JSX.Element {
 
   if (!isLocalNet()) {
     return (
-      <article style={cardStyle}>
-        <h2 style={{ fontSize: '1.35rem', margin: 0 }}>Sign Up</h2>
-        <p style={{ margin: 0, fontSize: '0.9rem', color: '#6b7280' }}>
-          Account creation is only available on LocalNet. Please set{' '}
-          <code style={{ background: '#f3f4f6', padding: '0.2rem 0.4rem', borderRadius: 4 }}>
-            VITE_NETWORK=LOCALNET
-          </code>{' '}
-          in your .env file.
-        </p>
-      </article>
+      <div className="card bg-base-100 shadow-xl border border-base-300">
+        <div className="card-body">
+          <h2 className="card-title">Sign Up</h2>
+          <p className="text-sm text-base-content/70">
+            Account creation is only available on LocalNet. Please set{' '}
+            <code className="bg-base-200 px-2 py-1 rounded text-xs">
+              VITE_NETWORK=LOCALNET
+            </code>{' '}
+            in your .env file.
+          </p>
+        </div>
+      </div>
     )
   }
 
   return (
-    <article style={cardStyle}>
-      <h2 style={{ fontSize: '1.35rem', margin: 0 }}>Sign Up</h2>
-      <p style={{ margin: 0, fontSize: '0.9rem', color: '#6b7280' }}>
-        Create a new account for this experiment. Your account will be funded with 10 Algos from the
-        LocalNet test wallet.
-      </p>
+    <div className="card bg-base-100 shadow-xl border border-base-300">
+      <div className="card-body">
+        <h2 className="card-title">Sign Up</h2>
+        <p className="text-sm text-base-content/70">
+          Create a new account for this experiment. Your account will be funded with 10 Algos from the
+          LocalNet test wallet.
+        </p>
 
-      {!createdAddress && (
-        <button
-          type="button"
-          onClick={handleCreateAccount}
-          disabled={creating}
-          style={{
-            ...primaryActionStyle,
-            opacity: creating ? 0.6 : 1,
-            cursor: creating ? 'wait' : 'pointer',
-          }}
-        >
-          {creating ? 'Creating Account...' : 'Create New Account'}
-        </button>
-      )}
-
-      {error && (
-        <div
-          style={{
-            padding: '1rem',
-            borderRadius: 8,
-            background: '#fef2f2',
-            border: '1px solid #ef4444',
-            marginTop: '0.5rem',
-          }}
-        >
-          <p style={{ margin: 0, fontSize: '0.85rem', color: '#dc2626' }}>
-            <strong>Error:</strong> {error}
-          </p>
-        </div>
-      )}
-
-      {createdAddress && (
-        <>
-          <div style={successBoxStyle}>
-            <p style={{ margin: 0, fontSize: '0.9rem', color: '#047857', fontWeight: 600 }}>
-              ✓ Account created successfully!
-            </p>
-            <p
-              style={{
-                margin: '0.5rem 0 0 0',
-                fontSize: '0.85rem',
-                color: '#065f46',
-                fontFamily: 'monospace',
-              }}
+        {!createdAddress && (
+          <div className="card-actions justify-start mt-2">
+            <button
+              type="button"
+              onClick={handleCreateAccount}
+              disabled={creating}
+              className={`btn btn-primary ${creating ? 'btn-disabled' : ''}`}
             >
-              <strong>Address:</strong> {shortAddress(createdAddress)}
-            </p>
-            <p
-              style={{
-                margin: '0.5rem 0 0 0',
-                fontSize: '0.75rem',
-                color: '#065f46',
-              }}
-            >
-              Your account has been funded with 10 Algos and saved to your browser.
-            </p>
+              {creating && <span className="loading loading-spinner loading-sm"></span>}
+              {creating ? 'Creating Account...' : 'Create New Account'}
+            </button>
           </div>
+        )}
 
-          <p
-            style={{
-              margin: '0.75rem 0 0 0',
-              fontSize: '0.85rem',
-              color: '#4b5563',
-            }}
-          >
-            Ready to continue? Visit the{' '}
-            <NavLink
-              to="/subject/register"
-              style={{ color: '#1d4ed8', textDecoration: 'underline' }}
+        {error && (
+          <div className="alert alert-error mt-4">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6 shrink-0 stroke-current"
+              fill="none"
+              viewBox="0 0 24 24"
             >
-              subject registration
-            </NavLink>{' '}
-            page.
-          </p>
-        </>
-      )}
-    </article>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <span>
+              <strong>Error:</strong> {error}
+            </span>
+          </div>
+        )}
+
+        {createdAddress && (
+          <>
+            <div className="alert alert-success mt-4">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-6 w-6 shrink-0 stroke-current"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <div>
+                <div className="font-semibold">Account created successfully!</div>
+                <div className="text-xs font-mono mt-1">
+                  <strong>Address:</strong> {shortAddress(createdAddress)}
+                </div>
+                <div className="text-xs mt-1">
+                  Your account has been funded with 10 Algos and saved to your browser.
+                </div>
+              </div>
+            </div>
+
+            <p className="text-sm text-base-content/70 mt-4">
+              Ready to continue? Visit the{' '}
+              <NavLink
+                to="/subject/register"
+                className="link link-primary"
+              >
+                subject registration
+              </NavLink>{' '}
+              page.
+            </p>
+          </>
+        )}
+      </div>
+    </div>
   )
 }
