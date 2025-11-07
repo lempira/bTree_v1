@@ -13,6 +13,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@algorandfoundation/algokit-utils": "^8.1.0",
     "@perawallet/connect": "^1.4.2",
     "@txnlab/use-wallet": "^2.0.0",
     "algosdk": "^3.4.0",

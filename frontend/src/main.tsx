@@ -8,21 +8,37 @@ import { router } from "./router";
 import "./index.css";
 
 const networkEnv = (import.meta.env.VITE_NETWORK as string | undefined)?.toUpperCase() ?? "TESTNET";
+const isLocalNet = networkEnv === "LOCALNET";
 const providerNetwork = networkEnv === "MAINNET" ? "MainNet" : "TestNet";
-const nodeServer = providerNetwork === "MainNet"
-  ? "https://mainnet-api.algonode.cloud"
-  : "https://testnet-api.algonode.cloud";
+const nodeServer = isLocalNet
+  ? "http://localhost"
+  : providerNetwork === "MainNet"
+    ? "https://mainnet-api.algonode.cloud"
+    : "https://testnet-api.algonode.cloud";
 
 function WalletApp(): JSX.Element {
   const providers = useInitializeProviders({
-    providers: [
-      { id: PROVIDER_ID.PERA, clientStatic: PeraWalletConnect },
-    ],
+    providers: isLocalNet
+      ? [
+          {
+            id: PROVIDER_ID.KMD,
+            clientOptions: {
+              wallet: "unencrypted-default-wallet",
+              password: "",
+              host: "http://localhost",
+              port: 4002,
+              token: "a".repeat(64),
+            },
+          },
+        ]
+      : [
+          { id: PROVIDER_ID.PERA, clientStatic: PeraWalletConnect },
+        ],
     nodeConfig: {
-      network: providerNetwork,
+      network: isLocalNet ? "SandNet" : providerNetwork,
       nodeServer,
-      nodePort: 443,
-      nodeToken: "",
+      nodePort: isLocalNet ? 4001 : 443,
+      nodeToken: isLocalNet ? "a".repeat(64) : "",
     },
   });
 
