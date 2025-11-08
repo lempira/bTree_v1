@@ -1,7 +1,7 @@
 import { algorand } from './algorand-client'
 import { algos } from '@algorandfoundation/algokit-utils'
-
-const STORAGE_KEY = 'btree_localnet_account'
+import { saveUserAccount, deleteUserAccount, getAllAccounts } from '../utils/indexdb'
+import type { UserAccount } from '../utils/indexdb'
 
 /**
  * Get the current network environment
@@ -77,38 +77,49 @@ export async function createNewAccount(): Promise<string> {
     await kmdClient.releaseWalletHandle(handleResp.wallet_handle_token)
   }
 
-  // Store in localStorage
-  storeLocalAccount(newAddress)
+  // Store in IndexedDB
+  await storeLocalAccount(newAddress)
 
   return newAddress
 }
 
 /**
- * Store account address in localStorage (LocalNet only)
+ * Store account in IndexedDB (LocalNet only)
  */
-export function storeLocalAccount(address: string): void {
+export async function storeLocalAccount(address: string): Promise<void> {
   if (!isLocalNet()) return
-  localStorage.setItem(STORAGE_KEY, address)
+
+  const account: UserAccount = {
+    accountAddress: address,
+    userType: 'subject',
+    createdAt: Date.now(),
+    lastLogin: Date.now(),
+  }
+
+  await saveUserAccount(account)
 }
 
 /**
- * Get stored account address from localStorage (LocalNet only)
+ * Get stored account address from IndexedDB (LocalNet only)
  */
-export function getStoredLocalAccount(): string | null {
+export async function getStoredLocalAccount(): Promise<string | null> {
   if (!isLocalNet()) return null
-  return localStorage.getItem(STORAGE_KEY)
+
+  const accounts = await getAllAccounts()
+  return accounts.length > 0 ? accounts[0].accountAddress : null
 }
 
 /**
- * Clear stored account from localStorage
+ * Clear stored account from IndexedDB
  */
-export function clearStoredLocalAccount(): void {
-  localStorage.removeItem(STORAGE_KEY)
+export async function clearStoredLocalAccount(address: string): Promise<void> {
+  await deleteUserAccount(address)
 }
 
 /**
- * Check if an account exists in localStorage
+ * Check if an account exists in IndexedDB
  */
-export function hasStoredAccount(): boolean {
-  return getStoredLocalAccount() !== null
+export async function hasStoredAccount(): Promise<boolean> {
+  const account = await getStoredLocalAccount()
+  return account !== null
 }
