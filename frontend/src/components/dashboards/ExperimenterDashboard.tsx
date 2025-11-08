@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { Experiment } from '../../types/experiment';
 import { getExperimenterExperiments } from '../../utils/experimentDB';
+import CreateExperimentModal from '../experiment/CreateExperimentModal';
 
 type TabType = 'experiments' | 'create';
 
@@ -24,6 +25,13 @@ export default function ExperimenterDashboard(): JSX.Element {
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleExperimentCreated(experimentId: string) {
+    console.log('Experiment created:', experimentId);
+    // Reload experiments and switch to experiments tab
+    loadExperiments();
+    setActiveTab('experiments');
   }
 
   return (
@@ -74,9 +82,10 @@ export default function ExperimenterDashboard(): JSX.Element {
         )}
 
         {activeTab === 'create' && (
-          <div className="text-center py-12 text-base-content/50">
-            <p>Create experiment form will appear here</p>
-          </div>
+          <CreateExperimentModal
+            experimenterId={experimenterId}
+            onCreated={handleExperimentCreated}
+          />
         )}
       </div>
     </div>
