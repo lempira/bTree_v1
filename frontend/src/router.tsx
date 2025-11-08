@@ -24,6 +24,7 @@ import SubjectPoolIndexer from "./pages/admin/SubjectPoolIndexer";
 import SubjectDashboard from "./components/dashboards/SubjectDashboard";
 import ExperimenterDashboard from "./components/dashboards/ExperimenterDashboard";
 import AdminDashboard from "./components/dashboards/AdminDashboard";
+import ExperimentDetail from "./pages/experimenter/ExperimentDetail";
 
 /* ---------- Inline stubs for /subject/* (we'll move to separate files later) ---------- */
 function SubjectLayout() {
@@ -193,6 +194,7 @@ export const router = createBrowserRouter([
       // Dashboard routes
       { path: 'dashboard/subject', element: <SubjectDashboard /> },
       { path: 'dashboard/experimenter', element: <ExperimenterDashboard /> },
+      { path: 'dashboard/experimenter/experiment/:id', element: <ExperimentDetail /> },
       { path: 'dashboard/admin', element: <AdminDashboard /> },
 
       // Existing pages

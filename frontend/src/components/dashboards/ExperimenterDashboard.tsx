@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Experiment } from '../../types/experiment';
 import { getExperimenterExperiments } from '../../utils/experimentDB';
 import CreateExperimentModal from '../experiment/CreateExperimentModal';
+import ExperimentList from '../experiment/ExperimentList';
 
 type TabType = 'experiments' | 'create';
 
 export default function ExperimenterDashboard(): JSX.Element {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('experiments');
   const [experiments, setExperiments] = useState<Experiment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +35,10 @@ export default function ExperimenterDashboard(): JSX.Element {
     // Reload experiments and switch to experiments tab
     loadExperiments();
     setActiveTab('experiments');
+  }
+
+  function handleExperimentClick(experimentId: string) {
+    navigate(`/dashboard/experimenter/experiment/${experimentId}`);
   }
 
   return (
@@ -70,13 +77,10 @@ export default function ExperimenterDashboard(): JSX.Element {
                 <span className="loading loading-spinner loading-lg"></span>
               </div>
             ) : (
-              <div className="text-center py-12 text-base-content/50">
-                {experiments.length === 0 ? (
-                  <p>No experiments yet. Create your first experiment to get started.</p>
-                ) : (
-                  <p>Experiment list will appear here</p>
-                )}
-              </div>
+              <ExperimentList
+                experiments={experiments}
+                onExperimentClick={handleExperimentClick}
+              />
             )}
           </div>
         )}
