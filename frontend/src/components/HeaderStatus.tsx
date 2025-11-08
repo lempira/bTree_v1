@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useWallet } from "@txnlab/use-wallet";
 import { isLocalNet } from "../chain/account-manager";
+import { getUserAccount } from "../utils/indexdb";
 
 function shortAddress(address?: string | null): string {
   if (!address) return "";
@@ -17,6 +18,12 @@ export default function HeaderStatus(): JSX.Element {
 
   // Ref for dialog element
   const dialogRef = useRef<HTMLDialogElement>(null);
+
+  // Error state for account selection
+  const [selectionError, setSelectionError] = useState<string | null>(null);
+
+  // Map of account addresses to userTypes
+  const [accountUserTypes, setAccountUserTypes] = useState<Map<string, string>>(new Map());
 
   // Active provider (assume single wallet)
   const activeProvider = useMemo(
@@ -91,8 +98,28 @@ export default function HeaderStatus(): JSX.Element {
     }
   }, [activeProvider, providers]);
 
+  // Load userTypes for all connected accounts when they change
+  useEffect(() => {
+    async function loadUserTypes() {
+      const userTypeMap = new Map<string, string>();
+
+      for (const acc of connectedAccounts) {
+        const userAccount = await getUserAccount(acc.address);
+        if (userAccount) {
+          userTypeMap.set(acc.address, userAccount.userType);
+        }
+      }
+
+      setAccountUserTypes(userTypeMap);
+    }
+
+    if (connectedAccounts.length > 0) {
+      void loadUserTypes();
+    }
+  }, [connectedAccounts]);
+
   const handleSelectAccount = useCallback(
-    (accountAddress: string) => {
+    async (accountAddress: string) => {
       const target = activeProvider ?? providers?.[0];
       if (!target) {
         console.warn("No wallet provider available");
@@ -100,11 +127,23 @@ export default function HeaderStatus(): JSX.Element {
       }
 
       try {
+        // Check if account has a userType in IndexedDB
+        const userAccount = await getUserAccount(accountAddress);
+
+        if (!userAccount) {
+          setSelectionError("This account has no assigned user type. Please create an account through Sign Up first.");
+          return;
+        }
+
+        // Clear any previous errors
+        setSelectionError(null);
+
         // Set the selected account as active
         target.setActiveAccount?.(accountAddress);
         dialogRef.current?.close();
       } catch (err) {
         console.error("Failed to set active account:", err);
+        setSelectionError("Failed to verify account. Please try again.");
       }
     },
     [activeProvider, providers]
@@ -166,6 +205,25 @@ export default function HeaderStatus(): JSX.Element {
             Choose a KMD account to sign in
           </p>
 
+          {selectionError && (
+            <div className="alert alert-error mt-4">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-6 w-6 shrink-0 stroke-current"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span className="text-sm">{selectionError}</span>
+            </div>
+          )}
+
           <div className="py-4">
             {connectedAccounts.length === 0 ? (
               <div className="text-sm text-gray-500">
@@ -173,30 +231,39 @@ export default function HeaderStatus(): JSX.Element {
               </div>
             ) : (
               <ul className="menu menu-vertical w-full">
-                {connectedAccounts.map((acc, idx) => (
-                  <li key={acc.address}>
-                    <button
-                      type="button"
-                      onClick={() => handleSelectAccount(acc.address)}
-                      className="flex items-center justify-between"
-                    >
-                      <span className="font-mono">{shortAddress(acc.address)}</span>
-                      <span className="badge badge-ghost badge-sm">Account {idx + 1}</span>
-                    </button>
-                  </li>
-                ))}
+                {connectedAccounts.map((acc) => {
+                  const userType = accountUserTypes.get(acc.address);
+                  const displayUserType = userType
+                    ? userType.charAt(0).toUpperCase() + userType.slice(1)
+                    : "No userType";
+
+                  return (
+                    <li key={acc.address}>
+                      <button
+                        type="button"
+                        onClick={() => void handleSelectAccount(acc.address)}
+                        className="flex items-center justify-between"
+                      >
+                        <span className="font-mono">{shortAddress(acc.address)}</span>
+                        <span className={`badge badge-sm ${userType ? 'badge-primary' : 'badge-error'}`}>
+                          {displayUserType}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
 
           <div className="modal-action">
             <form method="dialog">
-              <button className="btn btn-sm">Cancel</button>
+              <button className="btn btn-sm" onClick={() => setSelectionError(null)}>Cancel</button>
             </form>
           </div>
         </div>
         <form method="dialog" className="modal-backdrop">
-          <button>close</button>
+          <button onClick={() => setSelectionError(null)}>close</button>
         </form>
       </dialog>
     </div>
