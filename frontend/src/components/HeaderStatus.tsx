@@ -1,6 +1,7 @@
 // frontend/src/components/HeaderStatus.tsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useWallet } from "@txnlab/use-wallet";
+import { useNavigate } from "react-router-dom";
 import { isLocalNet } from "../chain/account-manager";
 import { getUserAccount } from "../utils/indexdb";
 
@@ -15,6 +16,7 @@ type ConnectionPhase = "connected" | "connecting" | "disconnected";
 export default function HeaderStatus(): JSX.Element {
   const wallet = useWallet();
   const { activeAddress, activeAccount, connectedAccounts, providers } = wallet;
+  const navigate = useNavigate();
 
   // Ref for dialog element
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -65,10 +67,12 @@ export default function HeaderStatus(): JSX.Element {
     const target = activeProvider ?? providers?.[0];
     try {
       await (target as any)?.disconnect?.();
+      // Navigate to home page after disconnect
+      navigate("/");
     } catch (err) {
       console.warn("disconnect failed", err);
     }
-  }, [activeProvider, providers]);
+  }, [activeProvider, providers, navigate]);
 
   const handleSignIn = useCallback(async () => {
     if (!isLocalNet()) {
@@ -141,12 +145,16 @@ export default function HeaderStatus(): JSX.Element {
         // Set the selected account as active
         target.setActiveAccount?.(accountAddress);
         dialogRef.current?.close();
+
+        // Redirect to appropriate dashboard based on userType
+        const dashboardRoute = `/dashboard/${userAccount.userType}`;
+        navigate(dashboardRoute);
       } catch (err) {
         console.error("Failed to set active account:", err);
         setSelectionError("Failed to verify account. Please try again.");
       }
     },
-    [activeProvider, providers]
+    [activeProvider, providers, navigate]
   );
 
   const shortAddr = useMemo(() => (address ? shortAddress(address) : null), [address]);
@@ -231,27 +239,33 @@ export default function HeaderStatus(): JSX.Element {
               </div>
             ) : (
               <ul className="menu menu-vertical w-full">
-                {connectedAccounts.map((acc) => {
-                  const userType = accountUserTypes.get(acc.address);
-                  const displayUserType = userType
-                    ? userType.charAt(0).toUpperCase() + userType.slice(1)
-                    : "No userType";
+                {connectedAccounts
+                  .filter((acc) => accountUserTypes.has(acc.address))
+                  .map((acc) => {
+                    const userType = accountUserTypes.get(acc.address)!;
+                    const displayUserType = userType.charAt(0).toUpperCase() + userType.slice(1);
 
-                  return (
-                    <li key={acc.address}>
-                      <button
-                        type="button"
-                        onClick={() => void handleSelectAccount(acc.address)}
-                        className="flex items-center justify-between"
-                      >
-                        <span className="font-mono">{shortAddress(acc.address)}</span>
-                        <span className={`badge badge-sm ${userType ? 'badge-primary' : 'badge-error'}`}>
-                          {displayUserType}
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
+                    // Different badge colors for each userType
+                    const badgeColor =
+                      userType === 'subject' ? 'badge-info' :
+                      userType === 'experimenter' ? 'badge-success' :
+                      'badge-warning';
+
+                    return (
+                      <li key={acc.address}>
+                        <button
+                          type="button"
+                          onClick={() => void handleSelectAccount(acc.address)}
+                          className="flex items-center justify-between"
+                        >
+                          <span className="font-mono">{shortAddress(acc.address)}</span>
+                          <span className={`badge badge-sm ${badgeColor}`}>
+                            {displayUserType}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
               </ul>
             )}
           </div>

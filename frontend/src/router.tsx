@@ -21,6 +21,9 @@ import AdminHome from "./pages/admin/AdminHome";
 import AdminSubjectPool from "./pages/admin/SubjectPool";
 import RegistryControls from "./pages/admin/RegistryControls";
 import SubjectPoolIndexer from "./pages/admin/SubjectPoolIndexer";
+import SubjectDashboard from "./components/dashboards/SubjectDashboard";
+import ExperimenterDashboard from "./components/dashboards/ExperimenterDashboard";
+import AdminDashboard from "./components/dashboards/AdminDashboard";
 
 /* ---------- Inline stubs for /subject/* (we'll move to separate files later) ---------- */
 function SubjectLayout() {
@@ -186,6 +189,11 @@ export const router = createBrowserRouter([
           { path: 'link', element: <LinkWallets /> },
         ],
       },
+
+      // Dashboard routes
+      { path: 'dashboard/subject', element: <SubjectDashboard /> },
+      { path: 'dashboard/experimenter', element: <ExperimenterDashboard /> },
+      { path: 'dashboard/admin', element: <AdminDashboard /> },
 
       // Existing pages
       { path: 'docs', element: <DocsHome /> },

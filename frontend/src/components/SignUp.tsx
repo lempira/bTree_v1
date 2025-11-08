@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { createNewAccount, isLocalNet } from '../chain/account-manager'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { useWallet } from '@txnlab/use-wallet'
 import type { UserType } from '../utils/indexdb'
 
 function shortAddress(address: string): string {
@@ -13,6 +14,15 @@ export default function SignUp(): JSX.Element {
   const [createdAddress, setCreatedAddress] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selectedUserType, setSelectedUserType] = useState<UserType>('subject')
+  const navigate = useNavigate()
+  const wallet = useWallet()
+  const { providers } = wallet
+
+  // Get active provider (KMD on LocalNet)
+  const activeProvider = useMemo(
+    () => providers?.find((p) => (p as any).isActive) ?? providers?.[0],
+    [providers]
+  )
 
   const handleCreateAccount = useCallback(async () => {
     if (!isLocalNet()) {
@@ -27,13 +37,35 @@ export default function SignUp(): JSX.Element {
       const newAddress = await createNewAccount(selectedUserType)
       setCreatedAddress(newAddress)
       console.log('Account created successfully:', newAddress)
+
+      // Connect to wallet provider and sign in the new account
+      const target = activeProvider ?? providers?.[0]
+      if (target) {
+        try {
+          // Connect to KMD if not already connected
+          if (!target.isActive) {
+            await target.connect()
+            target.setActiveProvider?.()
+          }
+
+          // Set the newly created account as active
+          target.setActiveAccount?.(newAddress)
+          console.log('Signed in as:', newAddress)
+        } catch (walletErr) {
+          console.error('Failed to sign in to wallet:', walletErr)
+        }
+      }
+
+      // Redirect to appropriate dashboard after successful account creation
+      const dashboardRoute = `/dashboard/${selectedUserType}`
+      navigate(dashboardRoute)
     } catch (err: any) {
       console.error('Failed to create account:', err)
       setError(err?.message || 'Failed to create account')
     } finally {
       setCreating(false)
     }
-  }, [selectedUserType])
+  }, [selectedUserType, navigate, activeProvider, providers])
 
   if (!isLocalNet()) {
     return (
