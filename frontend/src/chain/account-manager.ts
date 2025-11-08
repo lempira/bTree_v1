@@ -1,7 +1,7 @@
 import { algorand } from './algorand-client'
 import { algos } from '@algorandfoundation/algokit-utils'
 import { saveUserAccount, deleteUserAccount, getAllAccounts } from '../utils/indexdb'
-import type { UserAccount } from '../utils/indexdb'
+import type { UserAccount, UserType } from '../utils/indexdb'
 
 /**
  * Get the current network environment
@@ -25,7 +25,7 @@ export function isLocalNet(): boolean {
  * Imports the account into KMD wallet so it can be used with @txnlab/use-wallet
  * Returns the new account address
  */
-export async function createNewAccount(): Promise<string> {
+export async function createNewAccount(userType: UserType = 'subject'): Promise<string> {
   if (!isLocalNet()) {
     throw new Error('Account creation is only available on LocalNet')
   }
@@ -78,7 +78,7 @@ export async function createNewAccount(): Promise<string> {
   }
 
   // Store in IndexedDB
-  await storeLocalAccount(newAddress)
+  await storeLocalAccount(newAddress, userType)
 
   return newAddress
 }
@@ -86,12 +86,12 @@ export async function createNewAccount(): Promise<string> {
 /**
  * Store account in IndexedDB (LocalNet only)
  */
-export async function storeLocalAccount(address: string): Promise<void> {
+export async function storeLocalAccount(address: string, userType: UserType = 'subject'): Promise<void> {
   if (!isLocalNet()) return
 
   const account: UserAccount = {
     accountAddress: address,
-    userType: 'subject',
+    userType,
     createdAt: Date.now(),
     lastLogin: Date.now(),
   }

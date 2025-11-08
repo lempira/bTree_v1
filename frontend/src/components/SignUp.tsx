@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { createNewAccount, isLocalNet } from '../chain/account-manager'
 import { NavLink } from 'react-router-dom'
+import type { UserType } from '../utils/indexdb'
 
 function shortAddress(address: string): string {
   if (address.length <= 10) return address
@@ -11,6 +12,7 @@ export default function SignUp(): JSX.Element {
   const [creating, setCreating] = useState(false)
   const [createdAddress, setCreatedAddress] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [selectedUserType, setSelectedUserType] = useState<UserType>('subject')
 
   const handleCreateAccount = useCallback(async () => {
     if (!isLocalNet()) {
@@ -22,7 +24,7 @@ export default function SignUp(): JSX.Element {
     setError(null)
 
     try {
-      const newAddress = await createNewAccount()
+      const newAddress = await createNewAccount(selectedUserType)
       setCreatedAddress(newAddress)
       console.log('Account created successfully:', newAddress)
     } catch (err: any) {
@@ -31,7 +33,7 @@ export default function SignUp(): JSX.Element {
     } finally {
       setCreating(false)
     }
-  }, [])
+  }, [selectedUserType])
 
   if (!isLocalNet()) {
     return (
@@ -60,17 +62,60 @@ export default function SignUp(): JSX.Element {
         </p>
 
         {!createdAddress && (
-          <div className="card-actions justify-start mt-2">
-            <button
-              type="button"
-              onClick={handleCreateAccount}
-              disabled={creating}
-              className={`btn btn-primary ${creating ? 'btn-disabled' : ''}`}
-            >
-              {creating && <span className="loading loading-spinner loading-sm"></span>}
-              {creating ? 'Creating Account...' : 'Create New Account'}
-            </button>
-          </div>
+          <>
+            <div className="form-control w-full mt-4">
+              <div className="flex flex-row gap-6">
+                <label className="label cursor-pointer justify-start gap-2">
+                  <input
+                    type="radio"
+                    name="userType"
+                    className="radio radio-primary"
+                    value="subject"
+                    checked={selectedUserType === 'subject'}
+                    onChange={(e) => setSelectedUserType(e.target.value as UserType)}
+                    disabled={creating}
+                  />
+                  <span className="label-text">Subject</span>
+                </label>
+                <label className="label cursor-pointer justify-start gap-2">
+                  <input
+                    type="radio"
+                    name="userType"
+                    className="radio radio-primary"
+                    value="experimenter"
+                    checked={selectedUserType === 'experimenter'}
+                    onChange={(e) => setSelectedUserType(e.target.value as UserType)}
+                    disabled={creating}
+                  />
+                  <span className="label-text">Experimenter</span>
+                </label>
+                <label className="label cursor-pointer justify-start gap-2">
+                  <input
+                    type="radio"
+                    name="userType"
+                    className="radio radio-primary"
+                    value="admin"
+                    checked={selectedUserType === 'admin'}
+                    onChange={(e) => setSelectedUserType(e.target.value as UserType)}
+                    disabled={creating}
+                  />
+                  <span className="label-text">Admin</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="card-actions justify-start mt-4">
+              <button
+                type="button"
+                onClick={handleCreateAccount}
+                disabled={creating}
+                className={`btn btn-primary ${creating ? 'btn-disabled' : ''}`}
+              >
+                {creating && <span className="loading loading-spinner loading-sm"></span>}
+                {creating ? 'Creating Account...' : 'Create New Account'}
+              </button>
+            </div>
+          </>
         )}
 
         {error && (
@@ -114,6 +159,9 @@ export default function SignUp(): JSX.Element {
                 <div className="font-semibold">Account created successfully!</div>
                 <div className="text-xs font-mono mt-1">
                   <strong>Address:</strong> {shortAddress(createdAddress)}
+                </div>
+                <div className="text-xs mt-1">
+                  <strong>Role:</strong> {selectedUserType.charAt(0).toUpperCase() + selectedUserType.slice(1)}
                 </div>
                 <div className="text-xs mt-1">
                   Your account has been funded with 10 Algos and saved to your browser.
