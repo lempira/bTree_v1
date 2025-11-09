@@ -3,7 +3,7 @@
 import type { Decision } from '../types/experiment';
 import { initDB, STORES } from './db';
 import { updatePair } from './sessionDB';
-import { validateInvestment } from '../game/trustGame';
+import { validateInvestment, validateReturn, calculatePayouts } from '../game/trustGame';
 
 export async function createDecision(
   decision: Omit<Decision, 'id' | 'timestamp'>
@@ -122,5 +122,44 @@ export async function submitInvestorDecision(
   await updatePair(sessionId, pairId, {
     s_invested: investment,
     phase: 'waiting_s2',
+  });
+}
+
+export async function submitTrusteeDecision(
+  sessionId: string,
+  pairId: string,
+  subjectId: string,
+  returnAmount: number,
+  received: number,
+  E1: number,
+  E2: number,
+  m: number,
+  s_invested: number,
+  UNIT: number
+): Promise<void> {
+  // Validate return
+  if (!validateReturn(returnAmount, received, UNIT)) {
+    throw new Error('Invalid return amount');
+  }
+
+  // Create decision record
+  await createDecision({
+    sessionId,
+    pairId,
+    subjectId,
+    role: 's2',
+    decision: returnAmount,
+  });
+
+  // Calculate final payouts
+  const { s1_payout, s2_payout } = calculatePayouts(E1, E2, m, s_invested, returnAmount);
+
+  // Update pair with return, payouts, and mark as completed
+  await updatePair(sessionId, pairId, {
+    r_returned: returnAmount,
+    s1_payout,
+    s2_payout,
+    phase: 'completed',
+    completedAt: Date.now(),
   });
 }
