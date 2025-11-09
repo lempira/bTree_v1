@@ -2,6 +2,7 @@
 
 import type { Experiment } from '../types/experiment';
 import { initDB, STORES } from './db';
+import { getSession } from './sessionDB';
 
 export async function createExperiment(
   experiment: Omit<Experiment, 'id' | 'createdAt' | 'updatedAt'>
@@ -92,4 +93,14 @@ export async function deleteExperiment(id: string): Promise<void> {
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
   });
+}
+
+export async function getExperimentForSession(sessionId: string): Promise<Experiment | undefined> {
+  const session = await getSession(sessionId);
+
+  if (!session) {
+    return undefined;
+  }
+
+  return getExperiment(session.experimentId);
 }
