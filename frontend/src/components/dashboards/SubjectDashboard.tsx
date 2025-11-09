@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
-import type { SessionPair, Experiment } from '../../types/experiment';
-import { findSubjectPair } from '../../utils/sessionDB';
+import type { SessionPair, Experiment, Session } from '../../types/experiment';
+import { findSubjectPair, findSessionsForSubject } from '../../utils/sessionDB';
 import { getExperimentForSession } from '../../utils/experimentDB';
 import InvestorInterface from '../subject/InvestorInterface';
 import TrusteeInterface from '../subject/TrusteeInterface';
 import WaitingRoom from '../subject/WaitingRoom';
 import ResultsDisplay from '../subject/ResultsDisplay';
+import { useWallet } from '@txnlab/use-wallet';
 
 const POLL_INTERVAL = 3000; // 3 seconds
 
 export default function SubjectDashboard(): JSX.Element {
+  const { activeAddress } = useWallet();
   const [sessionId, setSessionId] = useState('');
   const [subjectId, setSubjectId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,23 +21,52 @@ export default function SubjectDashboard(): JSX.Element {
     role: 's1' | 's2';
   } | null>(null);
   const [experiment, setExperiment] = useState<Experiment | null>(null);
+  const [availableSessions, setAvailableSessions] = useState<Session[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(true);
 
-  async function handleJoinSession() {
+  // Load sessions assigned to the logged-in subject
+  useEffect(() => {
+    async function loadMySessions() {
+      if (!activeAddress) {
+        setLoadingSessions(false);
+        return;
+      }
+
+      try {
+        const sessions = await findSessionsForSubject(activeAddress);
+        setAvailableSessions(sessions);
+      } catch (err) {
+        console.error('Failed to load sessions:', err);
+        setError('Failed to load your sessions');
+      } finally {
+        setLoadingSessions(false);
+      }
+    }
+
+    loadMySessions();
+  }, [activeAddress]);
+
+  async function handleJoinSession(selectedSessionId?: string, selectedSubjectId?: string) {
     setError(null);
 
-    if (!sessionId.trim() || !subjectId.trim()) {
+    const finalSessionId = selectedSessionId || sessionId.trim();
+    const finalSubjectId = selectedSubjectId || subjectId.trim();
+
+    if (!finalSessionId || !finalSubjectId) {
       setError('Please enter both Session ID and Subject ID');
       return;
     }
 
     try {
       setLoading(true);
-      const result = await findSubjectPair(sessionId.trim(), subjectId.trim());
+      const result = await findSubjectPair(finalSessionId, finalSubjectId);
 
       if (result) {
+        setSessionId(finalSessionId);
+        setSubjectId(finalSubjectId);
         setAssignment(result);
         // Load experiment data
-        const exp = await getExperimentForSession(sessionId.trim());
+        const exp = await getExperimentForSession(finalSessionId);
         if (exp) {
           setExperiment(exp);
         }
@@ -117,70 +148,99 @@ export default function SubjectDashboard(): JSX.Element {
     return <WaitingRoom role={role} phase={pair.phase} />;
   }
 
+  function truncateId(id: string): string {
+    if (id.length <= 12) return id;
+    return `${id.slice(0, 8)}...${id.slice(-4)}`;
+  }
+
   return (
     <div className="container mx-auto p-4 max-w-2xl">
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Subject Dashboard</h1>
         <p className="text-base-content/70 mt-2">
-          Enter your session and subject IDs to participate in the experiment
+          {!activeAddress
+            ? 'Please sign in to view your assigned sessions'
+            : assignment
+            ? 'Participating in session'
+            : 'Select a session to join'}
         </p>
       </div>
 
       {!assignment ? (
-        <div className="card bg-base-100 border border-base-300">
-          <div className="card-body">
-            <h2 className="card-title">Join Session</h2>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Session ID</span>
-              </label>
-              <input
-                type="text"
-                className="input input-bordered"
-                value={sessionId}
-                onChange={(e) => setSessionId(e.target.value)}
-                placeholder="Enter session ID..."
-              />
-            </div>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Subject ID</span>
-              </label>
-              <input
-                type="text"
-                className="input input-bordered"
-                value={subjectId}
-                onChange={(e) => setSubjectId(e.target.value)}
-                placeholder="Enter your subject ID..."
-              />
-            </div>
-
-            {error && (
-              <div className="alert alert-error">
-                <span>{error}</span>
+        <>
+          {!activeAddress ? (
+            <div className="card bg-base-100 border border-base-300">
+              <div className="card-body">
+                <p className="text-center text-base-content/70">
+                  Please sign in to view your assigned sessions
+                </p>
               </div>
-            )}
-
-            <div className="card-actions justify-end mt-4">
-              <button
-                className="btn btn-primary"
-                onClick={handleJoinSession}
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <span className="loading loading-spinner loading-sm"></span>
-                    Joining...
-                  </>
-                ) : (
-                  'Join Session'
-                )}
-              </button>
             </div>
-          </div>
-        </div>
+          ) : loadingSessions ? (
+            <div className="card bg-base-100 border border-base-300">
+              <div className="card-body">
+                <div className="flex justify-center items-center py-8">
+                  <span className="loading loading-spinner loading-lg"></span>
+                </div>
+              </div>
+            </div>
+          ) : availableSessions.length > 0 ? (
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold">Your Sessions</h2>
+              {availableSessions.map((session) => (
+                <div
+                  key={session.id}
+                  className="card bg-base-100 border border-base-300 hover:border-primary transition-colors"
+                >
+                  <div className="card-body">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="card-title text-lg">{session.name}</h3>
+                        <p className="text-sm text-base-content/60 mt-1">
+                          Session ID: {truncateId(session.id)}
+                        </p>
+                        <p className="text-sm text-base-content/60">
+                          Status: <span className="badge badge-sm">{session.status}</span>
+                        </p>
+                        <p className="text-sm text-base-content/60">
+                          Pairs: {session.pairs.length}
+                        </p>
+                      </div>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => handleJoinSession(session.id, activeAddress!)}
+                        disabled={loading || session.status === 'completed'}
+                      >
+                        {loading ? (
+                          <>
+                            <span className="loading loading-spinner loading-xs"></span>
+                            Joining...
+                          </>
+                        ) : (
+                          'Join'
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="card bg-base-100 border border-base-300">
+              <div className="card-body">
+                <p className="text-center text-base-content/70">
+                  No sessions assigned yet. Please wait for an experimenter to add you to a session.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="alert alert-error mt-4">
+              <span>{error}</span>
+            </div>
+          )}
+        </>
       ) : experiment ? (
         renderGameState()
       ) : (

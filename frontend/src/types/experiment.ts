@@ -57,6 +57,14 @@ export interface Session {
 
 export type SubjectRole = 's1' | 's2';
 
+export interface Subject {
+  id: string;              // Algorand account address (used as primary key)
+  account: string;         // Algorand account address (same as id)
+  alias: string;           // Human-readable name/alias for the subject
+  createdAt: number;       // Timestamp when subject was registered
+  lastParticipated?: number; // Optional: timestamp of last session participation
+}
+
 export interface Decision {
   id: string;
   sessionId: string;

@@ -138,3 +138,25 @@ export async function findSubjectPair(
 
   return null;
 }
+
+export async function getAllSessions(): Promise<Session[]> {
+  const db = await initDB();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORES.SESSIONS], 'readonly');
+    const store = transaction.objectStore(STORES.SESSIONS);
+    const request = store.getAll();
+
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function findSessionsForSubject(subjectId: string): Promise<Session[]> {
+  const allSessions = await getAllSessions();
+
+  // Filter sessions where the subject appears in any pair (as s1_id or s2_id)
+  return allSessions.filter(session =>
+    session.pairs.some(pair => pair.s1_id === subjectId || pair.s2_id === subjectId)
+  );
+}

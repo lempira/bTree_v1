@@ -14,6 +14,7 @@ export default function SignUp(): JSX.Element {
   const [createdAddress, setCreatedAddress] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selectedUserType, setSelectedUserType] = useState<UserType>('subject')
+  const [alias, setAlias] = useState('')
   const navigate = useNavigate()
   const wallet = useWallet()
   const { providers } = wallet
@@ -34,7 +35,7 @@ export default function SignUp(): JSX.Element {
     setError(null)
 
     try {
-      const newAddress = await createNewAccount(selectedUserType)
+      const newAddress = await createNewAccount(selectedUserType, alias.trim() || undefined)
       setCreatedAddress(newAddress)
       console.log('Account created successfully:', newAddress)
 
@@ -65,7 +66,7 @@ export default function SignUp(): JSX.Element {
     } finally {
       setCreating(false)
     }
-  }, [selectedUserType, navigate, activeProvider, providers])
+  }, [selectedUserType, alias, navigate, activeProvider, providers])
 
   if (!isLocalNet()) {
     return (
@@ -96,6 +97,28 @@ export default function SignUp(): JSX.Element {
         {!createdAddress && (
           <>
             <div className="form-control w-full mt-4">
+              <label className="label">
+                <span className="label-text font-medium">Alias (Display Name)</span>
+              </label>
+              <input
+                type="text"
+                className="input input-bordered"
+                value={alias}
+                onChange={(e) => setAlias(e.target.value)}
+                placeholder="e.g., Alice, Bob, Lab123, etc."
+                disabled={creating}
+              />
+              <label className="label">
+                <span className="label-text-alt text-base-content/60">
+                  Optional: A friendly name to identify this account
+                </span>
+              </label>
+            </div>
+
+            <div className="form-control w-full mt-4">
+              <label className="label">
+                <span className="label-text font-medium">Account Type</span>
+              </label>
               <div className="flex flex-row gap-6">
                 <label className="label cursor-pointer justify-start gap-2">
                   <input

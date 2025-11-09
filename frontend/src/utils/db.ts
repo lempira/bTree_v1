@@ -1,6 +1,6 @@
 // Shared IndexedDB initialization for experiment data
 // Database: btree_experiments
-// Stores: experiments, sessions, decisions
+// Stores: experiments, sessions, decisions, subjects
 
 const DB_NAME = 'btree_experiments';
 const DB_VERSION = 1;
@@ -9,6 +9,7 @@ export const STORES = {
   EXPERIMENTS: 'experiments',
   SESSIONS: 'sessions',
   DECISIONS: 'decisions',
+  SUBJECTS: 'subjects',
 } as const;
 
 let dbInstance: IDBDatabase | null = null;
@@ -50,6 +51,14 @@ export async function initDB(): Promise<IDBDatabase> {
         decisionsStore.createIndex('sessionId', 'sessionId', { unique: false });
         decisionsStore.createIndex('pairId', 'pairId', { unique: false });
         decisionsStore.createIndex('subjectId', 'subjectId', { unique: false });
+      }
+
+      // Subjects store
+      if (!db.objectStoreNames.contains(STORES.SUBJECTS)) {
+        const subjectsStore = db.createObjectStore(STORES.SUBJECTS, { keyPath: 'id' });
+        subjectsStore.createIndex('alias', 'alias', { unique: false });
+        subjectsStore.createIndex('createdAt', 'createdAt', { unique: false });
+        subjectsStore.createIndex('lastParticipated', 'lastParticipated', { unique: false });
       }
     };
   });

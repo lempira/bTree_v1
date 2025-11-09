@@ -24,8 +24,9 @@ export default function HeaderStatus(): JSX.Element {
   // Error state for account selection
   const [selectionError, setSelectionError] = useState<string | null>(null);
 
-  // Map of account addresses to userTypes
+  // Map of account addresses to userTypes and displayNames
   const [accountUserTypes, setAccountUserTypes] = useState<Map<string, string>>(new Map());
+  const [accountDisplayNames, setAccountDisplayNames] = useState<Map<string, string>>(new Map());
 
   // Active provider (assume single wallet)
   const activeProvider = useMemo(
@@ -102,19 +103,24 @@ export default function HeaderStatus(): JSX.Element {
     }
   }, [activeProvider, providers]);
 
-  // Load userTypes for all connected accounts when they change
+  // Load userTypes and displayNames for all connected accounts when they change
   useEffect(() => {
     async function loadUserTypes() {
       const userTypeMap = new Map<string, string>();
+      const displayNameMap = new Map<string, string>();
 
       for (const acc of connectedAccounts) {
         const userAccount = await getUserAccount(acc.address);
         if (userAccount) {
           userTypeMap.set(acc.address, userAccount.userType);
+          if (userAccount.displayName) {
+            displayNameMap.set(acc.address, userAccount.displayName);
+          }
         }
       }
 
       setAccountUserTypes(userTypeMap);
+      setAccountDisplayNames(displayNameMap);
     }
 
     if (connectedAccounts.length > 0) {
@@ -243,6 +249,7 @@ export default function HeaderStatus(): JSX.Element {
                   .filter((acc) => accountUserTypes.has(acc.address))
                   .map((acc) => {
                     const userType = accountUserTypes.get(acc.address)!;
+                    const displayName = accountDisplayNames.get(acc.address);
                     const displayUserType = userType.charAt(0).toUpperCase() + userType.slice(1);
 
                     // Different badge colors for each userType
@@ -256,12 +263,21 @@ export default function HeaderStatus(): JSX.Element {
                         <button
                           type="button"
                           onClick={() => void handleSelectAccount(acc.address)}
-                          className="flex items-center justify-between"
+                          className="flex flex-col items-start py-3"
                         >
-                          <span className="font-mono">{shortAddress(acc.address)}</span>
-                          <span className={`badge badge-sm ${badgeColor}`}>
-                            {displayUserType}
-                          </span>
+                          <div className="flex items-center justify-between w-full">
+                            <span className="font-semibold">
+                              {displayName || shortAddress(acc.address)}
+                            </span>
+                            <span className={`badge badge-sm ${badgeColor}`}>
+                              {displayUserType}
+                            </span>
+                          </div>
+                          {displayName && (
+                            <span className="text-xs text-gray-500 font-mono mt-1">
+                              {shortAddress(acc.address)}
+                            </span>
+                          )}
                         </button>
                       </li>
                     );

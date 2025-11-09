@@ -25,7 +25,7 @@ export function isLocalNet(): boolean {
  * Imports the account into KMD wallet so it can be used with @txnlab/use-wallet
  * Returns the new account address
  */
-export async function createNewAccount(userType: UserType = 'subject'): Promise<string> {
+export async function createNewAccount(userType: UserType = 'subject', displayName?: string): Promise<string> {
   if (!isLocalNet()) {
     throw new Error('Account creation is only available on LocalNet')
   }
@@ -78,7 +78,7 @@ export async function createNewAccount(userType: UserType = 'subject'): Promise<
   }
 
   // Store in IndexedDB
-  await storeLocalAccount(newAddress, userType)
+  await storeLocalAccount(newAddress, userType, displayName)
 
   return newAddress
 }
@@ -86,7 +86,7 @@ export async function createNewAccount(userType: UserType = 'subject'): Promise<
 /**
  * Store account in IndexedDB (LocalNet only)
  */
-export async function storeLocalAccount(address: string, userType: UserType = 'subject'): Promise<void> {
+export async function storeLocalAccount(address: string, userType: UserType = 'subject', displayName?: string): Promise<void> {
   if (!isLocalNet()) return
 
   const account: UserAccount = {
@@ -94,6 +94,7 @@ export async function storeLocalAccount(address: string, userType: UserType = 's
     userType,
     createdAt: Date.now(),
     lastLogin: Date.now(),
+    displayName,
   }
 
   await saveUserAccount(account)

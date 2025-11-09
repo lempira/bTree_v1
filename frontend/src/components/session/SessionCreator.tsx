@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Experiment } from '../../types/experiment';
 import { createSession } from '../../utils/sessionDB';
+import { upsertSubject } from '../../utils/subjectDB';
 import SubjectInput from './SubjectInput';
 import PairPreview from './PairPreview';
 
@@ -41,6 +42,18 @@ export default function SessionCreator({
 
     try {
       setCreating(true);
+
+      // Auto-register subjects in the subjects store
+      // Use account address as both id and account, with the address as default alias
+      await Promise.all(
+        subjects.map(subjectId =>
+          upsertSubject({
+            id: subjectId,
+            account: subjectId,
+            alias: subjectId, // Default alias is the account address
+          })
+        )
+      );
 
       // Create pairs from subjects
       const numPairs = subjects.length / 2;
