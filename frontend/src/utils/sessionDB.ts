@@ -116,3 +116,25 @@ export async function deleteSession(id: string): Promise<void> {
     request.onerror = () => reject(request.error);
   });
 }
+
+export async function findSubjectPair(
+  sessionId: string,
+  subjectId: string
+): Promise<{ pair: SessionPair; role: 's1' | 's2' } | null> {
+  const session = await getSession(sessionId);
+
+  if (!session) {
+    return null;
+  }
+
+  for (const pair of session.pairs) {
+    if (pair.s1_id === subjectId) {
+      return { pair, role: 's1' };
+    }
+    if (pair.s2_id === subjectId) {
+      return { pair, role: 's2' };
+    }
+  }
+
+  return null;
+}
