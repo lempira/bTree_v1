@@ -2,6 +2,8 @@
 
 import type { Decision } from '../types/experiment';
 import { initDB, STORES } from './db';
+import { updatePair } from './sessionDB';
+import { validateInvestment } from '../game/trustGame';
 
 export async function createDecision(
   decision: Omit<Decision, 'id' | 'timestamp'>
@@ -91,5 +93,34 @@ export async function deleteDecision(id: string): Promise<void> {
 
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
+  });
+}
+
+export async function submitInvestorDecision(
+  sessionId: string,
+  pairId: string,
+  subjectId: string,
+  investment: number,
+  E1: number,
+  UNIT: number
+): Promise<void> {
+  // Validate investment
+  if (!validateInvestment(investment, E1, UNIT)) {
+    throw new Error('Invalid investment amount');
+  }
+
+  // Create decision record
+  await createDecision({
+    sessionId,
+    pairId,
+    subjectId,
+    role: 's1',
+    decision: investment,
+  });
+
+  // Update pair with investment and change phase
+  await updatePair(sessionId, pairId, {
+    s_invested: investment,
+    phase: 'waiting_s2',
   });
 }
