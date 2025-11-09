@@ -1,6 +1,13 @@
-import { useState } from 'react';
-import type { SessionPair } from '../../types/experiment';
+import { useState, useEffect } from 'react';
+import type { SessionPair, Experiment } from '../../types/experiment';
 import { findSubjectPair } from '../../utils/sessionDB';
+import { getExperimentForSession } from '../../utils/experimentDB';
+import InvestorInterface from '../subject/InvestorInterface';
+import TrusteeInterface from '../subject/TrusteeInterface';
+import WaitingRoom from '../subject/WaitingRoom';
+import ResultsDisplay from '../subject/ResultsDisplay';
+
+const POLL_INTERVAL = 3000; // 3 seconds
 
 export default function SubjectDashboard(): JSX.Element {
   const [sessionId, setSessionId] = useState('');
@@ -11,6 +18,7 @@ export default function SubjectDashboard(): JSX.Element {
     pair: SessionPair;
     role: 's1' | 's2';
   } | null>(null);
+  const [experiment, setExperiment] = useState<Experiment | null>(null);
 
   async function handleJoinSession() {
     setError(null);
@@ -26,6 +34,11 @@ export default function SubjectDashboard(): JSX.Element {
 
       if (result) {
         setAssignment(result);
+        // Load experiment data
+        const exp = await getExperimentForSession(sessionId.trim());
+        if (exp) {
+          setExperiment(exp);
+        }
       } else {
         setError('Subject not found in this session. Please check your IDs.');
       }
@@ -34,6 +47,74 @@ export default function SubjectDashboard(): JSX.Element {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function refreshPairState() {
+    if (!sessionId || !subjectId) return;
+
+    try {
+      const result = await findSubjectPair(sessionId, subjectId);
+      if (result) {
+        setAssignment(result);
+      }
+    } catch (err) {
+      console.error('Failed to refresh pair state:', err);
+    }
+  }
+
+  // Set up polling to refresh pair state
+  useEffect(() => {
+    if (!assignment) return;
+
+    const interval = setInterval(refreshPairState, POLL_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, [assignment, sessionId, subjectId]);
+
+  function handleDecisionMade() {
+    // Immediately refresh state after decision
+    refreshPairState();
+  }
+
+  // Determine which component to show based on role and phase
+  function renderGameState() {
+    if (!assignment || !experiment) return null;
+
+    const { pair, role } = assignment;
+
+    // Show results if completed
+    if (pair.phase === 'completed') {
+      return <ResultsDisplay pair={pair} role={role} experiment={experiment} />;
+    }
+
+    // Show investor interface if S1 and waiting for S1
+    if (role === 's1' && pair.phase === 'waiting_s1') {
+      return (
+        <InvestorInterface
+          sessionId={sessionId}
+          pair={pair}
+          subjectId={subjectId}
+          experiment={experiment}
+          onDecisionMade={handleDecisionMade}
+        />
+      );
+    }
+
+    // Show trustee interface if S2 and waiting for S2
+    if (role === 's2' && pair.phase === 'waiting_s2') {
+      return (
+        <TrusteeInterface
+          sessionId={sessionId}
+          pair={pair}
+          subjectId={subjectId}
+          experiment={experiment}
+          onDecisionMade={handleDecisionMade}
+        />
+      );
+    }
+
+    // Otherwise show waiting room
+    return <WaitingRoom role={role} phase={pair.phase} />;
   }
 
   return (
@@ -100,49 +181,13 @@ export default function SubjectDashboard(): JSX.Element {
             </div>
           </div>
         </div>
+      ) : experiment ? (
+        renderGameState()
       ) : (
         <div className="card bg-base-100 border border-base-300">
           <div className="card-body">
-            <h2 className="card-title">Session Joined</h2>
-
-            <div className="space-y-4">
-              <div className="alert alert-success">
-                <span>Successfully joined the session!</span>
-              </div>
-
-              <div className="stats stats-vertical lg:stats-horizontal shadow">
-                <div className="stat">
-                  <div className="stat-title">Your Role</div>
-                  <div className="stat-value text-primary">
-                    {assignment.role === 's1' ? 'Investor (S1)' : 'Trustee (S2)'}
-                  </div>
-                  <div className="stat-desc">
-                    {assignment.role === 's1'
-                      ? 'You will make the first decision'
-                      : 'You will respond to the investor'}
-                  </div>
-                </div>
-
-                <div className="stat">
-                  <div className="stat-title">Current Phase</div>
-                  <div className="stat-value text-sm">
-                    {assignment.pair.phase === 'waiting_s1' && 'Waiting for Investor'}
-                    {assignment.pair.phase === 'waiting_s2' && 'Waiting for Trustee'}
-                    {assignment.pair.phase === 'completed' && 'Completed'}
-                  </div>
-                  <div className="stat-desc">
-                    {assignment.pair.phase === 'completed'
-                      ? 'Experiment round finished'
-                      : 'Waiting for decisions...'}
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-sm text-base-content/70">
-                <p>Session ID: <code className="font-mono text-xs">{sessionId}</code></p>
-                <p>Subject ID: <code className="font-mono text-xs">{subjectId}</code></p>
-                <p>Pair ID: <code className="font-mono text-xs">{assignment.pair.pairId}</code></p>
-              </div>
+            <div className="flex justify-center items-center py-12">
+              <span className="loading loading-spinner loading-lg"></span>
             </div>
           </div>
         </div>
