@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import SignUp from "../components/SignUp";
+import DataCleaner from "../components/DataCleaner";
 
 const secondaryActionStyle: React.CSSProperties = {
   display: "inline-flex",
@@ -48,6 +49,7 @@ export default function Landing(): JSX.Element {
         }}
       >
         <SignUp />
+        <DataCleaner />
       </section>
     </main>
   );

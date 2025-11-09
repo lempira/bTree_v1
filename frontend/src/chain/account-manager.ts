@@ -1,94 +1,27 @@
-import { algorand } from './algorand-client'
-import { algos } from '@algorandfoundation/algokit-utils'
 import { saveUserAccount, deleteUserAccount, getAllAccounts } from '../utils/indexdb'
 import type { UserAccount, UserType } from '../utils/indexdb'
 
 /**
- * Get the current network environment
- */
-export function getNetwork(): 'LOCALNET' | 'TESTNET' | 'MAINNET' {
-  const network = (import.meta.env.VITE_NETWORK as string | undefined)?.toUpperCase() ?? 'TESTNET'
-  if (network === 'LOCALNET') return 'LOCALNET'
-  if (network === 'MAINNET') return 'MAINNET'
-  return 'TESTNET'
-}
-
-/**
- * Check if we're on LocalNet
- */
-export function isLocalNet(): boolean {
-  return getNetwork() === 'LOCALNET'
-}
-
-/**
- * Create a new random account and fund it from KMD (LocalNet only)
- * Imports the account into KMD wallet so it can be used with @txnlab/use-wallet
- * Returns the new account address
+ * Create a new account with a generated UUID
+ * Stores the account in IndexedDB
+ * Returns the new account ID
  */
 export async function createNewAccount(userType: UserType = 'subject', displayName?: string): Promise<string> {
-  if (!isLocalNet()) {
-    throw new Error('Account creation is only available on LocalNet')
-  }
+  // Generate a UUID for the account ID
+  const newAccountId = crypto.randomUUID()
 
-  // Generate random account
-  const newAccount = algorand.account.random()
-  const newAddress = String(newAccount.addr)
-
-  console.log('Generated new account:', newAddress)
-
-  // Get a KMD account to use as funder (any funded account)
-  const funder = await algorand.account.fromKmd(
-    'unencrypted-default-wallet',
-    (account) => account.amount > 1_000_000 // Has at least 1 Algo
-  )
-
-  console.log('Funding new account from:', funder.addr)
-
-  // Fund the new account with 10 Algos
-  await algorand.account.ensureFunded(
-    newAccount.addr,
-    funder.addr,
-    algos(10)
-  )
-
-  console.log('Successfully funded new account with 10 Algos')
-
-  // Import the new account into KMD wallet
-  console.log('Importing account into KMD wallet...')
-  const kmdClient = algorand.client.kmd
-
-  // Get wallet ID
-  const wallets = await kmdClient.listWallets()
-  const wallet = wallets.wallets.find((w: any) => w.name === 'unencrypted-default-wallet')
-
-  if (!wallet) {
-    throw new Error('KMD wallet "unencrypted-default-wallet" not found')
-  }
-
-  // Get wallet handle (like opening the wallet)
-  const handleResp = await kmdClient.initWalletHandle(wallet.id, '')
-
-  try {
-    // Import the private key into KMD
-    await kmdClient.importKey(handleResp.wallet_handle_token, newAccount.account.sk)
-    console.log('Successfully imported account into KMD wallet')
-  } finally {
-    // Always release the wallet handle (close the wallet)
-    await kmdClient.releaseWalletHandle(handleResp.wallet_handle_token)
-  }
+  console.log('Generated new account:', newAccountId)
 
   // Store in IndexedDB
-  await storeLocalAccount(newAddress, userType, displayName)
+  await storeLocalAccount(newAccountId, userType, displayName)
 
-  return newAddress
+  return newAccountId
 }
 
 /**
- * Store account in IndexedDB (LocalNet only)
+ * Store account in IndexedDB
  */
 export async function storeLocalAccount(address: string, userType: UserType = 'subject', displayName?: string): Promise<void> {
-  if (!isLocalNet()) return
-
   const account: UserAccount = {
     accountAddress: address,
     userType,
@@ -101,11 +34,9 @@ export async function storeLocalAccount(address: string, userType: UserType = 's
 }
 
 /**
- * Get stored account address from IndexedDB (LocalNet only)
+ * Get stored account address from IndexedDB
  */
 export async function getStoredLocalAccount(): Promise<string | null> {
-  if (!isLocalNet()) return null
-
   const accounts = await getAllAccounts()
   return accounts.length > 0 ? accounts[0].accountAddress : null
 }

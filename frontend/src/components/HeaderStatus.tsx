@@ -1,9 +1,9 @@
 // frontend/src/components/HeaderStatus.tsx
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useWallet } from "@txnlab/use-wallet";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { isLocalNet } from "../chain/account-manager";
-import { getUserAccount } from "../utils/indexdb";
+import { getUserAccount, getAllAccounts } from "../utils/indexdb";
+import { useActiveAccount } from "../hooks/useActiveAccount";
+import type { UserAccount } from "../utils/indexdb";
 
 function shortAddress(address?: string | null): string {
   if (!address) return "";
@@ -11,11 +11,8 @@ function shortAddress(address?: string | null): string {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
 }
 
-type ConnectionPhase = "connected" | "connecting" | "disconnected";
-
 export default function HeaderStatus(): JSX.Element {
-  const wallet = useWallet();
-  const { activeAddress, activeAccount, connectedAccounts, providers } = wallet;
+  const { activeAddress, setActiveAccount, clearActiveAccount } = useActiveAccount();
   const navigate = useNavigate();
 
   // Ref for dialog element
@@ -24,118 +21,50 @@ export default function HeaderStatus(): JSX.Element {
   // Error state for account selection
   const [selectionError, setSelectionError] = useState<string | null>(null);
 
-  // Map of account addresses to userTypes and displayNames
-  const [accountUserTypes, setAccountUserTypes] = useState<Map<string, string>>(new Map());
-  const [accountDisplayNames, setAccountDisplayNames] = useState<Map<string, string>>(new Map());
+  // All accounts from IndexedDB
+  const [allAccounts, setAllAccounts] = useState<UserAccount[]>([]);
 
-  // Active provider (assume single wallet)
-  const activeProvider = useMemo(
-    () => providers?.find((p) => (p as any).isActive) ?? providers?.[0],
-    [providers]
-  );
-
-  // Derive address
-  const address = useMemo(() => {
-    const addr =
-      activeAccount?.address ||
-      activeAddress ||
-      (connectedAccounts?.length ? connectedAccounts[0]?.address : null);
-    return addr ?? null;
-  }, [activeAccount, activeAddress, connectedAccounts]);
-
-  const isConnected = Boolean(address);
-  const isConnectingFlag = Boolean(
-    (wallet as any)?.isConnecting || (wallet as any)?.status === "CONNECTING"
-  );
-
-  // Debounce "connecting" flicker
-  const [showConnecting, setShowConnecting] = useState(isConnectingFlag);
+  // Load all accounts from IndexedDB
   useEffect(() => {
-    if (isConnectingFlag && address) {
-      const t = window.setTimeout(() => setShowConnecting(false), 50);
-      return () => window.clearTimeout(t);
+    async function loadAccounts() {
+      try {
+        const accounts = await getAllAccounts();
+        setAllAccounts(accounts);
+      } catch (err) {
+        console.error("Failed to load accounts:", err);
+      }
     }
-    setShowConnecting(isConnectingFlag);
-    return undefined;
-  }, [address, isConnectingFlag]);
 
-  const phase: ConnectionPhase = useMemo(() => {
-    if (isConnected) return "connected";
-    return showConnecting ? "connecting" : "disconnected";
-  }, [isConnected, showConnecting]);
+    loadAccounts();
+  }, []);
+
+  const isConnected = Boolean(activeAddress);
 
   const handleDisconnect = useCallback(async () => {
-    const target = activeProvider ?? providers?.[0];
     try {
-      await (target as any)?.disconnect?.();
+      clearActiveAccount();
       // Navigate to home page after disconnect
       navigate("/");
     } catch (err) {
       console.warn("disconnect failed", err);
     }
-  }, [activeProvider, providers, navigate]);
+  }, [clearActiveAccount, navigate]);
 
   const handleSignIn = useCallback(async () => {
-    if (!isLocalNet()) {
-      console.warn("Sign in is only available on LocalNet");
-      return;
-    }
-
-    const target = activeProvider ?? providers?.[0];
-    if (!target) {
-      console.warn("No wallet provider available");
-      return;
-    }
-
     try {
-      // Connect to KMD provider - this automatically fetches all accounts
-      await target.connect();
-
-      // Set as active provider if not already
-      if (!target.isActive) {
-        target.setActiveProvider?.();
-      }
+      // Load all accounts from IndexedDB
+      const accounts = await getAllAccounts();
+      setAllAccounts(accounts);
 
       // Show the account picker modal
       dialogRef.current?.showModal();
     } catch (err) {
-      console.error("Failed to connect to KMD:", err);
+      console.error("Failed to load accounts:", err);
     }
-  }, [activeProvider, providers]);
-
-  // Load userTypes and displayNames for all connected accounts when they change
-  useEffect(() => {
-    async function loadUserTypes() {
-      const userTypeMap = new Map<string, string>();
-      const displayNameMap = new Map<string, string>();
-
-      for (const acc of connectedAccounts) {
-        const userAccount = await getUserAccount(acc.address);
-        if (userAccount) {
-          userTypeMap.set(acc.address, userAccount.userType);
-          if (userAccount.displayName) {
-            displayNameMap.set(acc.address, userAccount.displayName);
-          }
-        }
-      }
-
-      setAccountUserTypes(userTypeMap);
-      setAccountDisplayNames(displayNameMap);
-    }
-
-    if (connectedAccounts.length > 0) {
-      void loadUserTypes();
-    }
-  }, [connectedAccounts]);
+  }, []);
 
   const handleSelectAccount = useCallback(
     async (accountAddress: string) => {
-      const target = activeProvider ?? providers?.[0];
-      if (!target) {
-        console.warn("No wallet provider available");
-        return;
-      }
-
       try {
         // Check if account has a userType in IndexedDB
         const userAccount = await getUserAccount(accountAddress);
@@ -148,8 +77,8 @@ export default function HeaderStatus(): JSX.Element {
         // Clear any previous errors
         setSelectionError(null);
 
-        // Set the selected account as active
-        target.setActiveAccount?.(accountAddress);
+        // Set the selected account as active in this tab
+        setActiveAccount(accountAddress);
         dialogRef.current?.close();
 
         // Redirect to appropriate dashboard based on userType
@@ -160,37 +89,29 @@ export default function HeaderStatus(): JSX.Element {
         setSelectionError("Failed to verify account. Please try again.");
       }
     },
-    [activeProvider, providers, navigate]
+    [setActiveAccount, navigate]
   );
 
-  const shortAddr = useMemo(() => (address ? shortAddress(address) : null), [address]);
+  const shortAddr = activeAddress ? shortAddress(activeAddress) : null;
 
   // Build badge label
-  const pillLabel = useMemo(() => {
-    if (phase === "connecting") return "Connecting...";
-    if (phase === "connected") {
-      return shortAddr || "Connected";
-    }
-    return "Not connected";
-  }, [phase, shortAddr]);
+  const pillLabel = isConnected ? (shortAddr || "Connected") : "Not connected";
 
   return (
     <div className="flex items-center whitespace-nowrap relative">
-      {/* Connecting or Connected state */}
-      {phase !== "disconnected" && (
+      {/* Connected state */}
+      {isConnected && (
         <span
           aria-live="polite"
-          className={`badge badge-lg ${
-            phase === "connected" ? "badge-success" : "badge-warning"
-          }`}
-          title={phase === "connected" ? address ?? undefined : undefined}
+          className="badge badge-lg badge-success"
+          title={activeAddress ?? undefined}
         >
           {pillLabel}
         </span>
       )}
 
       {/* Sign In button when disconnected */}
-      {phase === "disconnected" && (
+      {!isConnected && (
         <button
           type="button"
           onClick={() => void handleSignIn()}
@@ -201,7 +122,7 @@ export default function HeaderStatus(): JSX.Element {
       )}
 
       {/* Disconnect button when connected */}
-      {phase === "connected" && (
+      {isConnected && (
         <button
           type="button"
           onClick={() => void handleDisconnect()}
@@ -216,7 +137,7 @@ export default function HeaderStatus(): JSX.Element {
         <div className="modal-box">
           <h3 className="text-lg font-bold">Select Account</h3>
           <p className="text-sm text-gray-600 mt-1">
-            Choose a KMD account to sign in
+            Choose an account to sign in
           </p>
 
           {selectionError && (
@@ -239,49 +160,45 @@ export default function HeaderStatus(): JSX.Element {
           )}
 
           <div className="py-4">
-            {connectedAccounts.length === 0 ? (
+            {allAccounts.length === 0 ? (
               <div className="text-sm text-gray-500">
-                No KMD accounts available
+                No accounts available. Please create an account first.
               </div>
             ) : (
               <ul className="menu menu-vertical w-full">
-                {connectedAccounts
-                  .filter((acc) => accountUserTypes.has(acc.address))
-                  .map((acc) => {
-                    const userType = accountUserTypes.get(acc.address)!;
-                    const displayName = accountDisplayNames.get(acc.address);
-                    const displayUserType = userType.charAt(0).toUpperCase() + userType.slice(1);
+                {allAccounts.map((account) => {
+                  const displayUserType = account.userType.charAt(0).toUpperCase() + account.userType.slice(1);
 
-                    // Different badge colors for each userType
-                    const badgeColor =
-                      userType === 'subject' ? 'badge-info' :
-                      userType === 'experimenter' ? 'badge-success' :
-                      'badge-warning';
+                  // Different badge colors for each userType
+                  const badgeColor =
+                    account.userType === 'subject' ? 'badge-info' :
+                    account.userType === 'experimenter' ? 'badge-success' :
+                    'badge-warning';
 
-                    return (
-                      <li key={acc.address}>
-                        <button
-                          type="button"
-                          onClick={() => void handleSelectAccount(acc.address)}
-                          className="flex flex-col items-start py-3"
-                        >
-                          <div className="flex items-center justify-between w-full">
-                            <span className="font-semibold">
-                              {displayName || shortAddress(acc.address)}
-                            </span>
-                            <span className={`badge badge-sm ${badgeColor}`}>
-                              {displayUserType}
-                            </span>
-                          </div>
-                          {displayName && (
-                            <span className="text-xs text-gray-500 font-mono mt-1">
-                              {shortAddress(acc.address)}
-                            </span>
-                          )}
-                        </button>
-                      </li>
-                    );
-                  })}
+                  return (
+                    <li key={account.accountAddress}>
+                      <button
+                        type="button"
+                        onClick={() => void handleSelectAccount(account.accountAddress)}
+                        className="flex flex-col items-start py-3"
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className="font-semibold">
+                            {account.displayName || shortAddress(account.accountAddress)}
+                          </span>
+                          <span className={`badge badge-sm ${badgeColor}`}>
+                            {displayUserType}
+                          </span>
+                        </div>
+                        {account.displayName && (
+                          <span className="text-xs text-gray-500 font-mono mt-1">
+                            {shortAddress(account.accountAddress)}
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>

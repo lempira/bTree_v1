@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { useWallet, PROVIDER_ID } from "@txnlab/use-wallet";
-import { getUserAccount } from "../utils/indexdb";
+import { getAllAccounts } from "../utils/indexdb";
+import { useActiveAccount } from "../hooks/useActiveAccount";
+import type { UserAccount } from "../utils/indexdb";
 
 function shortAddress(address: string): string {
   if (address.length <= 10) return address;
@@ -8,55 +9,51 @@ function shortAddress(address: string): string {
 }
 
 export default function AccountSelector() {
-  const { providers, activeAddress, activeAccount } = useWallet();
-  const pera = providers?.find((p) => p.metadata.id === PROVIDER_ID.PERA);
-  const accounts = pera?.accounts || [];
-  const [accountAliases, setAccountAliases] = useState<Map<string, string>>(new Map());
+  const { activeAddress, setActiveAccount } = useActiveAccount();
+  const [accounts, setAccounts] = useState<UserAccount[]>([]);
 
-  // Load aliases for all accounts
+  // Load all accounts from IndexedDB
   useEffect(() => {
-    async function loadAliases() {
-      const aliasMap = new Map<string, string>();
-
-      for (const acc of accounts) {
-        const userAccount = await getUserAccount(acc.address);
-        if (userAccount?.displayName) {
-          aliasMap.set(acc.address, userAccount.displayName);
-        }
+    async function loadAccounts() {
+      try {
+        const allAccounts = await getAllAccounts();
+        setAccounts(allAccounts);
+      } catch (err) {
+        console.error("Failed to load accounts:", err);
       }
-
-      setAccountAliases(aliasMap);
     }
 
-    if (accounts.length > 0) {
-      void loadAliases();
-    }
-  }, [accounts]);
+    loadAccounts();
+  }, []);
 
-  if (!pera || accounts.length <= 1) return null;
+  // Don't show selector if 0 or 1 accounts
+  if (accounts.length <= 1) return null;
 
-  const current = activeAddress || activeAccount?.address || accounts[0]?.address || "";
+  const current = activeAddress || accounts[0]?.accountAddress || "";
 
   const onChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const addr = e.target.value;
-    try { pera.setActiveAccount(addr); } catch {}
+    try {
+      setActiveAccount(addr);
+    } catch (err) {
+      console.error("Failed to set active account:", err);
+    }
   };
 
-  const getDisplayText = (address: string): string => {
-    const alias = accountAliases.get(address);
-    if (alias) {
-      return `${alias} (${shortAddress(address)})`;
+  const getDisplayText = (account: UserAccount): string => {
+    if (account.displayName) {
+      return `${account.displayName} (${shortAddress(account.accountAddress)})`;
     }
-    return shortAddress(address);
+    return shortAddress(account.accountAddress);
   };
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <label htmlFor="acctSel" style={{ fontSize: 13, color: "#444" }}>Account:</label>
       <select id="acctSel" value={current} onChange={onChange} style={{ padding: "6px 8px", borderRadius: 6 }}>
-        {accounts.map((a) => (
-          <option key={a.address} value={a.address}>
-            {getDisplayText(a.address)}
+        {accounts.map((account) => (
+          <option key={account.accountAddress} value={account.accountAddress}>
+            {getDisplayText(account)}
           </option>
         ))}
       </select>

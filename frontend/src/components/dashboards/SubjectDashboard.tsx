@@ -6,12 +6,12 @@ import InvestorInterface from '../subject/InvestorInterface';
 import TrusteeInterface from '../subject/TrusteeInterface';
 import WaitingRoom from '../subject/WaitingRoom';
 import ResultsDisplay from '../subject/ResultsDisplay';
-import { useWallet } from '@txnlab/use-wallet';
+import { useActiveAccount } from '../../hooks/useActiveAccount';
 
 const POLL_INTERVAL = 3000; // 3 seconds
 
 export default function SubjectDashboard(): JSX.Element {
-  const { activeAddress } = useWallet();
+  const { activeAddress } = useActiveAccount();
   const [sessionId, setSessionId] = useState('');
   const [subjectId, setSubjectId] = useState('');
   const [loading, setLoading] = useState(false);

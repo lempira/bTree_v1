@@ -2,7 +2,7 @@
 
 import type { Decision } from '../types/experiment';
 import { initDB, STORES } from './db';
-import { updatePair } from './sessionDB';
+import { updatePair, checkAndUpdateSessionStatus } from './sessionDB';
 import { validateInvestment, validateReturn, calculatePayouts } from '../game/trustGame';
 
 export async function createDecision(
@@ -162,4 +162,7 @@ export async function submitTrusteeDecision(
     phase: 'completed',
     completedAt: Date.now(),
   });
+
+  // Check if all pairs in the session are completed, and if so, mark session as completed
+  await checkAndUpdateSessionStatus(sessionId);
 }

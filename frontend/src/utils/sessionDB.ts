@@ -160,3 +160,22 @@ export async function findSessionsForSubject(subjectId: string): Promise<Session
     session.pairs.some(pair => pair.s1_id === subjectId || pair.s2_id === subjectId)
   );
 }
+
+/**
+ * Check if all pairs in a session are completed, and if so, update session status to 'completed'
+ */
+export async function checkAndUpdateSessionStatus(sessionId: string): Promise<void> {
+  const session = await getSession(sessionId);
+
+  if (!session) {
+    throw new Error(`Session ${sessionId} not found`);
+  }
+
+  // Check if all pairs are completed
+  const allPairsCompleted = session.pairs.every(pair => pair.phase === 'completed');
+
+  // If all pairs are completed and session is still active, mark session as completed
+  if (allPairsCompleted && session.status === 'active') {
+    await updateSession(sessionId, { status: 'completed' });
+  }
+}

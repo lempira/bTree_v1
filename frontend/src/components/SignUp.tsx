@@ -1,7 +1,7 @@
-import { useState, useCallback, useMemo } from 'react'
-import { createNewAccount, isLocalNet } from '../chain/account-manager'
+import { useState, useCallback } from 'react'
+import { createNewAccount } from '../chain/account-manager'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { useWallet } from '@txnlab/use-wallet'
+import { useActiveAccount } from '../hooks/useActiveAccount'
 import type { UserType } from '../utils/indexdb'
 
 function shortAddress(address: string): string {
@@ -16,21 +16,9 @@ export default function SignUp(): JSX.Element {
   const [selectedUserType, setSelectedUserType] = useState<UserType>('subject')
   const [alias, setAlias] = useState('')
   const navigate = useNavigate()
-  const wallet = useWallet()
-  const { providers } = wallet
-
-  // Get active provider (KMD on LocalNet)
-  const activeProvider = useMemo(
-    () => providers?.find((p) => (p as any).isActive) ?? providers?.[0],
-    [providers]
-  )
+  const { setActiveAccount } = useActiveAccount()
 
   const handleCreateAccount = useCallback(async () => {
-    if (!isLocalNet()) {
-      setError('Account creation is only available on LocalNet')
-      return
-    }
-
     setCreating(true)
     setError(null)
 
@@ -39,23 +27,9 @@ export default function SignUp(): JSX.Element {
       setCreatedAddress(newAddress)
       console.log('Account created successfully:', newAddress)
 
-      // Connect to wallet provider and sign in the new account
-      const target = activeProvider ?? providers?.[0]
-      if (target) {
-        try {
-          // Connect to KMD if not already connected
-          if (!target.isActive) {
-            await target.connect()
-            target.setActiveProvider?.()
-          }
-
-          // Set the newly created account as active
-          target.setActiveAccount?.(newAddress)
-          console.log('Signed in as:', newAddress)
-        } catch (walletErr) {
-          console.error('Failed to sign in to wallet:', walletErr)
-        }
-      }
+      // Set as active account in this tab
+      setActiveAccount(newAddress)
+      console.log('Signed in as:', newAddress)
 
       // Redirect to appropriate dashboard after successful account creation
       const dashboardRoute = `/dashboard/${selectedUserType}`
@@ -66,32 +40,14 @@ export default function SignUp(): JSX.Element {
     } finally {
       setCreating(false)
     }
-  }, [selectedUserType, alias, navigate, activeProvider, providers])
-
-  if (!isLocalNet()) {
-    return (
-      <div className="card bg-base-100 shadow-xl border border-base-300">
-        <div className="card-body">
-          <h2 className="card-title">Sign Up</h2>
-          <p className="text-sm text-base-content/70">
-            Account creation is only available on LocalNet. Please set{' '}
-            <code className="bg-base-200 px-2 py-1 rounded text-xs">
-              VITE_NETWORK=LOCALNET
-            </code>{' '}
-            in your .env file.
-          </p>
-        </div>
-      </div>
-    )
-  }
+  }, [selectedUserType, alias, navigate, setActiveAccount])
 
   return (
     <div className="card bg-base-100 shadow-xl border border-base-300">
       <div className="card-body">
         <h2 className="card-title">Sign Up</h2>
         <p className="text-sm text-base-content/70">
-          Create a new account for this experiment. Your account will be funded with 10 Algos from the
-          LocalNet test wallet.
+          Create a new account for this experiment.
         </p>
 
         {!createdAddress && (
@@ -219,7 +175,7 @@ export default function SignUp(): JSX.Element {
                   <strong>Role:</strong> {selectedUserType.charAt(0).toUpperCase() + selectedUserType.slice(1)}
                 </div>
                 <div className="text-xs mt-1">
-                  Your account has been funded with 10 Algos and saved to your browser.
+                  Your account has been saved to your browser.
                 </div>
               </div>
             </div>
