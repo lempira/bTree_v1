@@ -1,14 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import type { Experiment } from '../../types/experiment';
+import type { Experiment, Session } from '../../types/experiment';
 import { getExperiment } from '../../utils/experimentDB';
+import { getExperimentSessions } from '../../utils/sessionDB';
+import SessionCreator from '../../components/session/SessionCreator';
+import SessionMonitor from '../../components/session/SessionMonitor';
 
 export default function ExperimentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [experiment, setExperiment] = useState<Experiment | null>(null);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [experimenterId] = useState('experimenter-1'); // TODO: Replace with actual user ID
 
   useEffect(() => {
     loadExperiment();
@@ -26,6 +31,9 @@ export default function ExperimentDetail() {
       const exp = await getExperiment(id);
       if (exp) {
         setExperiment(exp);
+        // Load sessions for this experiment
+        const sessionList = await getExperimentSessions(id);
+        setSessions(sessionList);
       } else {
         setError('Experiment not found');
       }
@@ -33,6 +41,15 @@ export default function ExperimentDetail() {
       setError(err instanceof Error ? err.message : 'Failed to load experiment');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleSessionCreated(sessionId: string) {
+    console.log('Session created:', sessionId);
+    // Reload sessions
+    if (id) {
+      const sessionList = await getExperimentSessions(id);
+      setSessions(sessionList);
     }
   }
 
@@ -124,14 +141,26 @@ export default function ExperimentDetail() {
         </div>
       </div>
 
-      {/* Sessions Section - Placeholder */}
-      <div className="card bg-base-100 border border-base-300">
-        <div className="card-body">
-          <h2 className="card-title">Sessions</h2>
-          <div className="text-center py-8 text-base-content/50">
-            <p>Session creation and management will appear here</p>
+      {/* Sessions Section */}
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold">Sessions</h2>
+
+        {/* Create New Session */}
+        <SessionCreator
+          experiment={experiment}
+          experimenterId={experimenterId}
+          onCreated={handleSessionCreated}
+        />
+
+        {/* Existing Sessions */}
+        {sessions.length > 0 && (
+          <div className="space-y-4">
+            <h3 className="text-xl font-semibold">Existing Sessions</h3>
+            {sessions.map((session) => (
+              <SessionMonitor key={session.id} session={session} />
+            ))}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
