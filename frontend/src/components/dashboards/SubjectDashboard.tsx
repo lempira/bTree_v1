@@ -12,6 +12,13 @@ import type { UserAccount } from '../../utils/indexdb';
 
 const POLL_INTERVAL = 3000; // 3 seconds
 
+interface SessionStatus {
+  isReady: boolean;
+  isCompleted: boolean;
+  role?: 's1' | 's2';
+  pair?: SessionPair;
+}
+
 export default function SubjectDashboard(): JSX.Element {
   const { activeAddress } = useActiveAccount();
   const [sessionId, setSessionId] = useState('');
@@ -125,8 +132,15 @@ export default function SubjectDashboard(): JSX.Element {
   }, [assignment, sessionId, subjectId]);
 
   function handleDecisionMade() {
-    // Immediately refresh state after decision
-    refreshPairState();
+    // Clear assignment to return to dashboard
+    setAssignment(null);
+    setExperiment(null);
+    setSessionId('');
+    setSubjectId('');
+    // Reload sessions to show updated status
+    if (activeAddress) {
+      findSessionsForSubject(activeAddress).then(setAvailableSessions);
+    }
   }
 
   // Determine which component to show based on role and phase
@@ -173,6 +187,30 @@ export default function SubjectDashboard(): JSX.Element {
   function truncateId(id: string): string {
     if (id.length <= 12) return id;
     return `${id.slice(0, 8)}...${id.slice(-4)}`;
+  }
+
+  function getSessionStatus(session: Session): SessionStatus {
+    if (!activeAddress) {
+      return { isReady: false, isCompleted: false };
+    }
+
+    // Find the pair this subject is in
+    for (const pair of session.pairs) {
+      if (pair.s1_id === activeAddress) {
+        // Subject is S1 (investor)
+        const isReady = pair.phase === 'waiting_s1';
+        const isCompleted = pair.phase === 'completed';
+        return { isReady, isCompleted, role: 's1', pair };
+      }
+      if (pair.s2_id === activeAddress) {
+        // Subject is S2 (trustee)
+        const isReady = pair.phase === 'waiting_s2';
+        const isCompleted = pair.phase === 'completed';
+        return { isReady, isCompleted, role: 's2', pair };
+      }
+    }
+
+    return { isReady: false, isCompleted: false };
   }
 
   return (
@@ -230,43 +268,52 @@ export default function SubjectDashboard(): JSX.Element {
           ) : availableSessions.length > 0 ? (
             <div className="space-y-4">
               <h2 className="text-xl font-semibold">Your Sessions</h2>
-              {availableSessions.map((session) => (
-                <div
-                  key={session.id}
-                  className="card bg-base-100 border border-base-300 hover:border-primary transition-colors"
-                >
-                  <div className="card-body">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="card-title text-lg">{session.name}</h3>
-                        <p className="text-sm text-base-content/60 mt-1">
-                          Session ID: {truncateId(session.id)}
-                        </p>
-                        <p className="text-sm text-base-content/60">
-                          Status: <span className="badge badge-sm">{session.status}</span>
-                        </p>
-                        <p className="text-sm text-base-content/60">
-                          Pairs: {session.pairs.length}
-                        </p>
+              {availableSessions.map((session) => {
+                const status = getSessionStatus(session);
+                const totalPlayers = session.pairs.length * 2;
+
+                return (
+                  <div
+                    key={session.id}
+                    className="card bg-base-100 border border-base-300 hover:border-primary transition-colors"
+                  >
+                    <div className="card-body">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="card-title text-lg">{session.name}</h3>
+                          <p className="text-sm text-base-content/60 mt-1">
+                            Session ID: {truncateId(session.id)}
+                          </p>
+                          <p className="text-sm text-base-content/60">
+                            Status: <span className="badge badge-sm">{session.status}</span>
+                          </p>
+                          <p className="text-sm text-base-content/60">
+                            Players: {totalPlayers}
+                          </p>
+                        </div>
+                        <button
+                          className={`btn btn-sm ${status.isReady ? 'btn-success' : 'btn-ghost'}`}
+                          onClick={() => handleJoinSession(session.id, activeAddress!)}
+                          disabled={loading || status.isCompleted || !status.isReady}
+                        >
+                          {loading ? (
+                            <>
+                              <span className="loading loading-spinner loading-xs"></span>
+                              Joining...
+                            </>
+                          ) : status.isCompleted ? (
+                            'Completed'
+                          ) : status.isReady ? (
+                            'Play'
+                          ) : (
+                            'Waiting'
+                          )}
+                        </button>
                       </div>
-                      <button
-                        className="btn btn-primary btn-sm"
-                        onClick={() => handleJoinSession(session.id, activeAddress!)}
-                        disabled={loading || session.status === 'completed'}
-                      >
-                        {loading ? (
-                          <>
-                            <span className="loading loading-spinner loading-xs"></span>
-                            Joining...
-                          </>
-                        ) : (
-                          'Join'
-                        )}
-                      </button>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="card bg-base-100 border border-base-300">

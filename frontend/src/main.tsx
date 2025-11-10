@@ -5,6 +5,7 @@ import { RouterProvider } from "react-router-dom";
 // COMMENTED OUT: Blockchain wallet functionality removed
 // import { WalletProvider, useInitializeProviders, PROVIDER_ID } from "@txnlab/use-wallet";
 // import { PeraWalletConnect } from "@perawallet/connect";
+import { ActiveAccountProvider } from "./hooks/useActiveAccount";
 import { router } from "./router";
 import "./index.css";
 
@@ -57,6 +58,8 @@ if (!root) throw new Error("Missing <div id=\"root\"> in index.html");
 
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
-    <RouterProvider router={router} />
+    <ActiveAccountProvider>
+      <RouterProvider router={router} />
+    </ActiveAccountProvider>
   </React.StrictMode>
 );

@@ -4,7 +4,7 @@ import type { Experiment, Session } from '../../types/experiment';
 import { getExperiment } from '../../utils/experimentDB';
 import { getExperimentSessions } from '../../utils/sessionDB';
 import SessionCreator from '../../components/session/SessionCreator';
-import SessionMonitor from '../../components/session/SessionMonitor';
+import SessionTable from '../../components/session/SessionTable';
 
 export default function ExperimentDetail() {
   const { id } = useParams<{ id: string }>();
@@ -154,11 +154,9 @@ export default function ExperimentDetail() {
 
         {/* Existing Sessions */}
         {sessions.length > 0 && (
-          <div className="space-y-4">
-            <h3 className="text-xl font-semibold">Existing Sessions</h3>
-            {sessions.map((session) => (
-              <SessionMonitor key={session.id} session={session} />
-            ))}
+          <div>
+            <h3 className="text-xl font-semibold mb-4">Existing Sessions</h3>
+            <SessionTable sessions={sessions} />
           </div>
         )}
       </div>
