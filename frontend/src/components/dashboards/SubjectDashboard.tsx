@@ -7,6 +7,8 @@ import TrusteeInterface from '../subject/TrusteeInterface';
 import WaitingRoom from '../subject/WaitingRoom';
 import ResultsDisplay from '../subject/ResultsDisplay';
 import { useActiveAccount } from '../../hooks/useActiveAccount';
+import { getUserAccount } from '../../utils/indexdb';
+import type { UserAccount } from '../../utils/indexdb';
 
 const POLL_INTERVAL = 3000; // 3 seconds
 
@@ -23,6 +25,26 @@ export default function SubjectDashboard(): JSX.Element {
   const [experiment, setExperiment] = useState<Experiment | null>(null);
   const [availableSessions, setAvailableSessions] = useState<Session[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
+  const [userAccount, setUserAccount] = useState<UserAccount | null>(null);
+
+  // Load user account information
+  useEffect(() => {
+    async function loadUserAccount() {
+      if (!activeAddress) {
+        setUserAccount(null);
+        return;
+      }
+
+      try {
+        const account = await getUserAccount(activeAddress);
+        setUserAccount(account || null);
+      } catch (err) {
+        console.error('Failed to load user account:', err);
+      }
+    }
+
+    loadUserAccount();
+  }, [activeAddress]);
 
   // Load sessions assigned to the logged-in subject
   useEffect(() => {
@@ -164,6 +186,27 @@ export default function SubjectDashboard(): JSX.Element {
             ? 'Participating in session'
             : 'Select a session to join'}
         </p>
+
+        {/* User Account Info */}
+        {activeAddress && userAccount && (
+          <div className="card bg-base-200 mt-4">
+            <div className="card-body py-3 px-4">
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">
+                      {userAccount.displayName || 'Subject'}
+                    </span>
+                    <span className="badge badge-info badge-sm">Subject</span>
+                  </div>
+                  <div className="text-xs text-base-content/60 font-mono mt-1">
+                    {truncateId(activeAddress)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {!assignment ? (

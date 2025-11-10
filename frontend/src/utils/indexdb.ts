@@ -40,16 +40,18 @@ export async function saveUserAccount(account: UserAccount): Promise<void> {
     const store = transaction.objectStore(STORE_NAME);
     const request = store.put(account);
 
-    request.onsuccess = () => {
-      resolve();
-    };
-
     request.onerror = () => {
       reject(request.error);
     };
 
     transaction.oncomplete = () => {
       db.close();
+      resolve();
+    };
+
+    transaction.onerror = () => {
+      db.close();
+      reject(transaction.error);
     };
   });
 }
@@ -61,8 +63,10 @@ export async function getUserAccount(accountAddress: string): Promise<UserAccoun
     const store = transaction.objectStore(STORE_NAME);
     const request = store.get(accountAddress);
 
+    let result: UserAccount | undefined;
+
     request.onsuccess = () => {
-      resolve(request.result);
+      result = request.result;
     };
 
     request.onerror = () => {
@@ -71,6 +75,12 @@ export async function getUserAccount(accountAddress: string): Promise<UserAccoun
 
     transaction.oncomplete = () => {
       db.close();
+      resolve(result);
+    };
+
+    transaction.onerror = () => {
+      db.close();
+      reject(transaction.error);
     };
   });
 }
@@ -82,8 +92,10 @@ export async function getAllAccounts(): Promise<UserAccount[]> {
     const store = transaction.objectStore(STORE_NAME);
     const request = store.getAll();
 
+    let result: UserAccount[] = [];
+
     request.onsuccess = () => {
-      resolve(request.result);
+      result = request.result;
     };
 
     request.onerror = () => {
@@ -92,6 +104,12 @@ export async function getAllAccounts(): Promise<UserAccount[]> {
 
     transaction.oncomplete = () => {
       db.close();
+      resolve(result);
+    };
+
+    transaction.onerror = () => {
+      db.close();
+      reject(transaction.error);
     };
   });
 }
@@ -103,16 +121,18 @@ export async function deleteUserAccount(accountAddress: string): Promise<void> {
     const store = transaction.objectStore(STORE_NAME);
     const request = store.delete(accountAddress);
 
-    request.onsuccess = () => {
-      resolve();
-    };
-
     request.onerror = () => {
       reject(request.error);
     };
 
     transaction.oncomplete = () => {
       db.close();
+      resolve();
+    };
+
+    transaction.onerror = () => {
+      db.close();
+      reject(transaction.error);
     };
   });
 }

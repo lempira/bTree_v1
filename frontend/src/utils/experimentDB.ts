@@ -1,13 +1,12 @@
 // CRUD operations for experiments store
 
 import type { Experiment } from '../types/experiment';
-import { initDB, STORES } from './db';
+import { STORES, executeReadTransaction, executeReadArrayTransaction, executeWriteTransaction } from './db';
 import { getSession } from './sessionDB';
 
 export async function createExperiment(
   experiment: Omit<Experiment, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<string> {
-  const db = await initDB();
   const id = crypto.randomUUID();
   const now = Date.now();
 
@@ -18,48 +17,32 @@ export async function createExperiment(
     updatedAt: now,
   };
 
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.EXPERIMENTS], 'readwrite');
-    const store = transaction.objectStore(STORES.EXPERIMENTS);
-    const request = store.add(fullExperiment);
+  await executeWriteTransaction(
+    STORES.EXPERIMENTS,
+    (store) => store.add(fullExperiment)
+  );
 
-    request.onsuccess = () => resolve(id);
-    request.onerror = () => reject(request.error);
-  });
+  return id;
 }
 
 export async function getExperiment(id: string): Promise<Experiment | undefined> {
-  const db = await initDB();
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.EXPERIMENTS], 'readonly');
-    const store = transaction.objectStore(STORES.EXPERIMENTS);
-    const request = store.get(id);
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+  return executeReadTransaction<Experiment>(
+    STORES.EXPERIMENTS,
+    (store) => store.get(id)
+  );
 }
 
 export async function getExperimenterExperiments(createdBy: string): Promise<Experiment[]> {
-  const db = await initDB();
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.EXPERIMENTS], 'readonly');
-    const store = transaction.objectStore(STORES.EXPERIMENTS);
-    const index = store.index('createdBy');
-    const request = index.getAll(createdBy);
-
-    request.onsuccess = () => resolve(request.result || []);
-    request.onerror = () => reject(request.error);
-  });
+  return executeReadArrayTransaction<Experiment>(
+    STORES.EXPERIMENTS,
+    (store) => store.index('createdBy').getAll(createdBy)
+  );
 }
 
 export async function updateExperiment(
   id: string,
   updates: Partial<Omit<Experiment, 'id' | 'createdAt' | 'createdBy'>>
 ): Promise<void> {
-  const db = await initDB();
   const existing = await getExperiment(id);
 
   if (!existing) {
@@ -72,27 +55,17 @@ export async function updateExperiment(
     updatedAt: Date.now(),
   };
 
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.EXPERIMENTS], 'readwrite');
-    const store = transaction.objectStore(STORES.EXPERIMENTS);
-    const request = store.put(updated);
-
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+  await executeWriteTransaction(
+    STORES.EXPERIMENTS,
+    (store) => store.put(updated)
+  );
 }
 
 export async function deleteExperiment(id: string): Promise<void> {
-  const db = await initDB();
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.EXPERIMENTS], 'readwrite');
-    const store = transaction.objectStore(STORES.EXPERIMENTS);
-    const request = store.delete(id);
-
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+  await executeWriteTransaction(
+    STORES.EXPERIMENTS,
+    (store) => store.delete(id)
+  );
 }
 
 export async function getExperimentForSession(sessionId: string): Promise<Experiment | undefined> {

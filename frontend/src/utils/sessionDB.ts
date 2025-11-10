@@ -1,12 +1,11 @@
 // CRUD operations for sessions store
 
 import type { Session, SessionPair } from '../types/experiment';
-import { initDB, STORES } from './db';
+import { STORES, executeReadTransaction, executeReadArrayTransaction, executeWriteTransaction } from './db';
 
 export async function createSession(
   session: Omit<Session, 'id' | 'createdAt'>
 ): Promise<string> {
-  const db = await initDB();
   const id = crypto.randomUUID();
   const now = Date.now();
 
@@ -16,48 +15,32 @@ export async function createSession(
     createdAt: now,
   };
 
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.SESSIONS], 'readwrite');
-    const store = transaction.objectStore(STORES.SESSIONS);
-    const request = store.add(fullSession);
+  await executeWriteTransaction(
+    STORES.SESSIONS,
+    (store) => store.add(fullSession)
+  );
 
-    request.onsuccess = () => resolve(id);
-    request.onerror = () => reject(request.error);
-  });
+  return id;
 }
 
 export async function getSession(id: string): Promise<Session | undefined> {
-  const db = await initDB();
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.SESSIONS], 'readonly');
-    const store = transaction.objectStore(STORES.SESSIONS);
-    const request = store.get(id);
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+  return executeReadTransaction<Session>(
+    STORES.SESSIONS,
+    (store) => store.get(id)
+  );
 }
 
 export async function getExperimentSessions(experimentId: string): Promise<Session[]> {
-  const db = await initDB();
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.SESSIONS], 'readonly');
-    const store = transaction.objectStore(STORES.SESSIONS);
-    const index = store.index('experimentId');
-    const request = index.getAll(experimentId);
-
-    request.onsuccess = () => resolve(request.result || []);
-    request.onerror = () => reject(request.error);
-  });
+  return executeReadArrayTransaction<Session>(
+    STORES.SESSIONS,
+    (store) => store.index('experimentId').getAll(experimentId)
+  );
 }
 
 export async function updateSession(
   id: string,
   updates: Partial<Omit<Session, 'id' | 'createdAt' | 'createdBy' | 'experimentId'>>
 ): Promise<void> {
-  const db = await initDB();
   const existing = await getSession(id);
 
   if (!existing) {
@@ -69,14 +52,10 @@ export async function updateSession(
     ...updates,
   };
 
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.SESSIONS], 'readwrite');
-    const store = transaction.objectStore(STORES.SESSIONS);
-    const request = store.put(updated);
-
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+  await executeWriteTransaction(
+    STORES.SESSIONS,
+    (store) => store.put(updated)
+  );
 }
 
 export async function updatePair(
@@ -105,16 +84,10 @@ export async function updatePair(
 }
 
 export async function deleteSession(id: string): Promise<void> {
-  const db = await initDB();
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.SESSIONS], 'readwrite');
-    const store = transaction.objectStore(STORES.SESSIONS);
-    const request = store.delete(id);
-
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+  await executeWriteTransaction(
+    STORES.SESSIONS,
+    (store) => store.delete(id)
+  );
 }
 
 export async function findSubjectPair(
@@ -140,16 +113,10 @@ export async function findSubjectPair(
 }
 
 export async function getAllSessions(): Promise<Session[]> {
-  const db = await initDB();
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.SESSIONS], 'readonly');
-    const store = transaction.objectStore(STORES.SESSIONS);
-    const request = store.getAll();
-
-    request.onsuccess = () => resolve(request.result || []);
-    request.onerror = () => reject(request.error);
-  });
+  return executeReadArrayTransaction<Session>(
+    STORES.SESSIONS,
+    (store) => store.getAll()
+  );
 }
 
 export async function findSessionsForSubject(subjectId: string): Promise<Session[]> {

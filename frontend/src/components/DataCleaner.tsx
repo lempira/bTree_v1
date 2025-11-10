@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useActiveAccount } from '../hooks/useActiveAccount';
+import { clearDBInstance } from '../utils/db';
 
 export default function DataCleaner() {
   const [clearing, setClearing] = useState(false);
@@ -47,15 +48,38 @@ export default function DataCleaner() {
 
     try {
       setClearing(true);
+      console.log('[DataCleaner] Starting experiment data deletion');
+
+      // Clear the cached database instance first
+      clearDBInstance();
+
       // Delete the entire btree_experiments database
       await new Promise<void>((resolve, reject) => {
+        console.log('[DataCleaner] Requesting database deletion');
         const request = indexedDB.deleteDatabase('btree_experiments');
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
+
+        request.onsuccess = () => {
+          console.log('[DataCleaner] Database deleted successfully');
+          resolve();
+        };
+
+        request.onerror = () => {
+          console.error('[DataCleaner] Database deletion failed:', request.error);
+          reject(request.error);
+        };
+
+        request.onblocked = () => {
+          console.warn('[DataCleaner] Database deletion blocked - close other tabs using this app');
+          resolve(); // Resolve anyway to show message
+        };
       });
 
-      setMessage({ type: 'success', text: 'All experiment data deleted' });
+      setMessage({ type: 'success', text: 'All experiment data deleted - reloading in 2s...' });
+      console.log('[DataCleaner] Waiting 2 seconds before reload to ensure deletion completes');
+      // Reload page to reinitialize everything - wait longer to ensure deletion completes
+      setTimeout(() => window.location.reload(), 2000);
     } catch (err) {
+      console.error('[DataCleaner] Error during deletion:', err);
       setMessage({ type: 'error', text: 'Failed to delete experiment data' });
     } finally {
       setClearing(false);
@@ -68,28 +92,60 @@ export default function DataCleaner() {
 
     try {
       setClearing(true);
+      console.log('[DataCleaner] Starting complete data deletion');
 
       // Clear sessionStorage
       clearActiveAccount();
 
-      // Delete both databases
+      // Clear the cached database instance
+      clearDBInstance();
+
+      // Wait a moment for any pending transactions to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      console.log('[DataCleaner] Deleting databases...');
+
+      // Delete both databases with timeout
+      const deleteWithTimeout = (dbName: string, timeoutMs = 5000) => {
+        return Promise.race([
+          new Promise<void>((resolve, reject) => {
+            console.log(`[DataCleaner] Requesting deletion of ${dbName}`);
+            const request = indexedDB.deleteDatabase(dbName);
+
+            request.onsuccess = () => {
+              console.log(`[DataCleaner] ${dbName} deleted successfully`);
+              resolve();
+            };
+
+            request.onerror = () => {
+              console.error(`[DataCleaner] ${dbName} deletion error:`, request.error);
+              reject(request.error);
+            };
+
+            request.onblocked = () => {
+              console.warn(`[DataCleaner] ${dbName} deletion blocked - resolving anyway`);
+              resolve();
+            };
+          }),
+          new Promise<void>((_, reject) =>
+            setTimeout(() => reject(new Error(`${dbName} deletion timed out after ${timeoutMs}ms`)), timeoutMs)
+          )
+        ]);
+      };
+
       await Promise.all([
-        new Promise<void>((resolve, reject) => {
-          const request = indexedDB.deleteDatabase('btree_accounts');
-          request.onsuccess = () => resolve();
-          request.onerror = () => reject(request.error);
-        }),
-        new Promise<void>((resolve, reject) => {
-          const request = indexedDB.deleteDatabase('btree_experiments');
-          request.onsuccess = () => resolve();
-          request.onerror = () => reject(request.error);
-        })
+        deleteWithTimeout('btree_accounts'),
+        deleteWithTimeout('btree_experiments')
       ]);
 
+      console.log('[DataCleaner] All databases deleted, reloading page');
       setMessage({ type: 'success', text: 'Everything deleted - complete reset' });
-      navigate('/');
+      // Reload to clean state
+      setTimeout(() => window.location.reload(), 1000);
     } catch (err) {
-      setMessage({ type: 'error', text: 'Failed to clear all data' });
+      console.error('[DataCleaner] Deletion failed:', err);
+      const errorMsg = err instanceof Error ? err.message : 'Failed to clear all data';
+      setMessage({ type: 'error', text: errorMsg });
     } finally {
       setClearing(false);
     }

@@ -1,12 +1,11 @@
 // CRUD operations for subjects store
 
 import type { Subject } from '../types/experiment';
-import { initDB, STORES } from './db';
+import { STORES, executeReadTransaction, executeReadArrayTransaction, executeWriteTransaction } from './db';
 
 export async function createSubject(
   subject: Omit<Subject, 'createdAt'>
 ): Promise<string> {
-  const db = await initDB();
   const now = Date.now();
 
   const fullSubject: Subject = {
@@ -14,47 +13,32 @@ export async function createSubject(
     createdAt: now,
   };
 
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.SUBJECTS], 'readwrite');
-    const store = transaction.objectStore(STORES.SUBJECTS);
-    const request = store.add(fullSubject);
+  await executeWriteTransaction(
+    STORES.SUBJECTS,
+    (store) => store.add(fullSubject)
+  );
 
-    request.onsuccess = () => resolve(subject.id);
-    request.onerror = () => reject(request.error);
-  });
+  return subject.id;
 }
 
 export async function getSubject(id: string): Promise<Subject | undefined> {
-  const db = await initDB();
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.SUBJECTS], 'readonly');
-    const store = transaction.objectStore(STORES.SUBJECTS);
-    const request = store.get(id);
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+  return executeReadTransaction<Subject>(
+    STORES.SUBJECTS,
+    (store) => store.get(id)
+  );
 }
 
 export async function getAllSubjects(): Promise<Subject[]> {
-  const db = await initDB();
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.SUBJECTS], 'readonly');
-    const store = transaction.objectStore(STORES.SUBJECTS);
-    const request = store.getAll();
-
-    request.onsuccess = () => resolve(request.result || []);
-    request.onerror = () => reject(request.error);
-  });
+  return executeReadArrayTransaction<Subject>(
+    STORES.SUBJECTS,
+    (store) => store.getAll()
+  );
 }
 
 export async function updateSubject(
   id: string,
   updates: Partial<Omit<Subject, 'id' | 'createdAt' | 'account'>>
 ): Promise<void> {
-  const db = await initDB();
   const existing = await getSubject(id);
 
   if (!existing) {
@@ -66,27 +50,17 @@ export async function updateSubject(
     ...updates,
   };
 
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.SUBJECTS], 'readwrite');
-    const store = transaction.objectStore(STORES.SUBJECTS);
-    const request = store.put(updated);
-
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+  await executeWriteTransaction(
+    STORES.SUBJECTS,
+    (store) => store.put(updated)
+  );
 }
 
 export async function deleteSubject(id: string): Promise<void> {
-  const db = await initDB();
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.SUBJECTS], 'readwrite');
-    const store = transaction.objectStore(STORES.SUBJECTS);
-    const request = store.delete(id);
-
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+  await executeWriteTransaction(
+    STORES.SUBJECTS,
+    (store) => store.delete(id)
+  );
 }
 
 export async function upsertSubject(subject: Omit<Subject, 'createdAt'>): Promise<void> {
